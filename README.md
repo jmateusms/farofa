@@ -1,6 +1,6 @@
 # farofa - failure and repair simulation optimization framework
 
-(**f**ailure **a**nd **r**epair simulation **o**ptimization **f**r**a**mework)
+(**F**ailure **A**nd **R**epair simulation **O**ptimization **F**r**A**mework)
 
 This project aims to create a framework for failure-repair simulation with modularity in mind. farofa is in very (very) early development stages, and **is not yet ready to use**. I have a vague roadmap for this project, which is detailed [below](#roadmap), but you can expect changes and details in the future.
 
