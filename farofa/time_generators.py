@@ -1,8 +1,8 @@
 import numpy as np
-from numba import njit
+from numba import njit, float64
 from .utils import safe_random
 
-@njit(fastmath=True)
+@njit(float64(float64))
 def exponential(rate):
     '''
     Generates an exponentially distributed random time.
@@ -19,7 +19,7 @@ def exponential(rate):
     
     return x
 
-@njit(fastmath=True)
+@njit(float64(float64, float64))
 def weibull(a, b):
     '''
     Generates a Weibull distributed random time. Considers perfect repair
@@ -39,7 +39,7 @@ def weibull(a, b):
 
     return x
 
-@njit(fastmath=True)
+@njit(float64(float64, float64, float64))
 def weibull_min(t, a, b):
     '''
     Generates a Weibull distributed random time. Considers minimal repair
@@ -61,7 +61,7 @@ def weibull_min(t, a, b):
 
     return x
 
-@njit(fastmath=True)
+@njit(float64(float64, float64, float64, float64))
 def weibull_grp(t,a,b,q=None):
     '''
     Generate Weibull distributed time conditioned to virtual age (Kijima Type I GRP).

@@ -1,8 +1,14 @@
 import farofa
-import timeit
+from time import time
 
-_ = farofa.weibull_grp(100, 100, 1.2, q=0.8) # "force" compilation by numba
+model = farofa.single_device('weibull', 'exponential')
+model.set_fail_parameters(100, 1.2)
+model.set_repair_parameters(0.1)
 
-t_numba = timeit.Timer(lambda: farofa.weibull_grp(100, 100, 1.2, q=0.8))
+start = time()
+failures = model.simulate(1000, 10000)
+end = time()
 
-print('Avg. time:', t_numba.timeit(number=100))
+print(f'Time: {end - start:.5f}s.')
+
+print(f'Avg. failures: {sum(failures)/len(failures):.2f}')
