@@ -2,11 +2,13 @@
 
 (**F**ailure **A**nd **R**epair simulation **O**ptimization **F**r**A**mework)
 
-This project aims to create a framework for failure-repair simulation with modularity in mind. farofa is in very (very) early development stages, and **is not yet ready to use**. I have a vague roadmap for this project, which is detailed [below](#roadmap), but you can expect changes and details in the future.
+This project aims to create a framework for failure-repair simulation with modularity in mind. farofa is in very (very) early development stages, and **is not yet ready to use**. I have a vague roadmap for this project, which is listed [below](#roadmap), but there's no timeline for it. If you're interested in this project, feel free to contact me. I'm open to suggestions and collaborations.
 
 ## what does it do?
 
-Right now, not much. But here's a brief overview of what I intend to include over the coming months.
+Right now, not much. It is possible to simulate a single device with failure and repair distributions of your choice (from the currently available ones in [distributions.py](farofa/distributions.py)). See [main.py](main.py) for an example.
+
+But here's a brief overview of what I intend to include over the coming months.
 
 In summary, this module should allow users to perform failure-repair simulations for multiple types of scenarios, such as considering different types of failure and repair time distributions, multiple devices in queueing systems, different priority classes, competing risks models. It should also allow users to create their own scenarios, in addition to using existing scenarios.
 
@@ -18,7 +20,7 @@ Concerning performance, Numba is being used to accelerate simulations. But since
 
 ## roadmap
 
-This is a general list of what I expect to include in this project. The order is more or less what I would expect to achieve. However, it is entirely possible that some features will be implemented sooner or later than expected.
+This is a general list of what I expect to include in this project. The order is more or less what I would expect to achieve. However, it is entirely possible that some features will be implemented sooner or later than expected. Also, I'm not able to work on this project as much as I'd like, so it may take a while to implement everything. Feel free to 
 
 - [ ] "v0"
   - [ ] Simple failure-repair simulation framework with a limited set of time distributions.

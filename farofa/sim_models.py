@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit, int64, float64
 
-from .time_generators import exponential, weibull, weibull_min, weibull_grp
+from .distributions import exponential, weibull, weibull_min, weibull_grp
 
 class single_device: # improve name?
     '''
