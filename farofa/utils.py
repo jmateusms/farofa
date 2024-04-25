@@ -6,6 +6,7 @@ from numba import njit, float64
 fpmin = float_info.min
 fpmax = float_info.max
 
+
 # functions
 @njit(float64())
 def safe_random():

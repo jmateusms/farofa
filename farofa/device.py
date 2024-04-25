@@ -7,26 +7,37 @@ distributions = {
     'weibull_grp': weibull_grp
 }
 
-class simple_device:
+
+class SimpleDevice:
     def __init__(self):
         self.operational = True
-    
+
+        self.failure_dist = None
+        self.failure_args = None
+        self.failure_kwargs = None
+
+        self.repair_dist = None
+        self.repair_args = None
+        self.repair_kwargs = None
+
+        self.mission_time = None
+
     def set_failure_dist(self, dist_name, *args, **kwargs):
         self.failure_dist = distributions[dist_name](*args, **kwargs)
         self.failure_args = args
         self.failure_kwargs = kwargs
 
         _ = self.failure_dist(*args, **kwargs)
-    
+
     def set_repair_dist(self, dist_name, *args, **kwargs):
         self.repair_dist = distributions[dist_name](*args, **kwargs)
         self.repair_args = args
         self.repair_kwargs = kwargs
 
         _ = self.repair_dist(*args, **kwargs)
-    
+
     def set_mission_time(self, mission_time):
-        if not type(mission_time) == float:
+        if mission_time is not float:
             try:
                 mission_time = float(mission_time)
             except Exception as e:
@@ -35,10 +46,10 @@ class simple_device:
         if mission_time < 1:
             raise ValueError('Mission time must be greater than 0.')
         self.mission_time = mission_time
-    
+
     def generate_failure(self):
         return self.failure_dist(*self.failure_args, **self.failure_kwargs)
-    
+
     def generate_repair(self):
         return self.repair_dist(*self.repair_args, **self.repair_kwargs)
 
@@ -47,11 +58,14 @@ class simple_device:
 
     def repair(self):
         self.operational = True
-    
+
     def simulate(self, reps=1):
-        if not type(reps) == int:
-            raise ValueError('Number of replications must be an integer.')
-        if reps < 1:
+        if reps is not int:
+            try:
+                reps = int(reps)
+            except ValueError:
+                raise ValueError('Number of replications must be an integer or convertible to integer.')
+        if reps <= 0:
             raise ValueError('Number of replications must be greater than 0.')
         if not hasattr(self, 'failure_dist'):
             raise ValueError('Failure distribution not set.')

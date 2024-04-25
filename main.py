@@ -1,7 +1,7 @@
 import farofa
 from time import time
 
-device = farofa.simple_device()
+device = farofa.SimpleDevice()
 
 device.set_failure_dist('exponential', 0.0001)
 device.set_repair_dist('exponential', 0.01)

@@ -3,10 +3,11 @@ from numba import njit, int64, float64
 
 from .distributions import exponential, weibull, weibull_min, weibull_grp
 
-class single_device: # improve name?
-    '''
+
+class SingleDevice:  # improve name?
+    """
     Simulate a single device, using chosen failure and repair time generators.
-    '''
+    """
 
     def __init__(self, fail_gen, repair_gen):
         if type(fail_gen) == str:
@@ -26,8 +27,8 @@ class single_device: # improve name?
                 raise ValueError('Invalid failure generator.')
         else:
             raise ValueError('Invalid failure generator.')
-        
-        if type(repair_gen) == str:
+
+        if repair_gen is str:
             if repair_gen.lower() in ['exp', 'exponential']:
                 self.repair_gen = exponential
                 self.repair_dist = 'exponential'
@@ -44,9 +45,14 @@ class single_device: # improve name?
                 raise ValueError('Invalid repair generator.')
         else:
             raise ValueError('Invalid repair generator.')
-        
+
+        self.fail_args = None
+        self.fail_kwargs = None
+        self.repair_args = None
+        self.repair_kwargs = None
+
         print(f'Failure and repair time generators set as {self.fail_dist} and {self.repair_dist}.')
-    
+
     def set_fail_parameters(self, *args, **kwargs):
         try:
             _ = self.fail_gen(*args, **kwargs)
@@ -56,7 +62,7 @@ class single_device: # improve name?
         except Exception as e:
             print(e)
             raise ValueError('Invalid failure parameters.')
-    
+
     def set_repair_parameters(self, *args, **kwargs):
         try:
             _ = self.repair_gen(*args, **kwargs)
@@ -66,17 +72,17 @@ class single_device: # improve name?
         except Exception as e:
             print(e)
             raise ValueError('Invalid repair parameters.')
-    
-    def simulate(self, T, reps=1): # TODO: use a numba function for the whole loop
-        '''
+
+    def simulate(self, T, reps=1):  # TODO: use a numba function for the whole loop
+        """
         Simulate single device for the specified mission time `T`.
-        '''
+        """
         failures = np.zeros(reps)
 
         for i in range(reps):
             t = 0
-            state = 1 # 1 = operational, 0 = failed
-            
+            state = 1  # 1 = operational, 0 = failed
+
             while t < T or state == 0:
                 if state == 1:
                     t += self.fail_gen(*self.fail_args, **self.fail_kwargs)
@@ -85,5 +91,5 @@ class single_device: # improve name?
                 else:
                     t += self.repair_gen(*self.repair_args, **self.repair_kwargs)
                     state = 1
-        
+
         return failures
