@@ -1,54 +1,135 @@
-# farofa - failure and repair simulation optimization framework
+# farofa
 
-(**F**ailure **A**nd **R**epair simulation **O**ptimization **F**r**A**mework)
+**F**ailure **A**nd **R**epair simulation **O**ptimization **F**r**A**mework
 
-This project aims to create a framework for failure-repair simulation with modularity in mind. farofa is in very (very) early development stages, and **is not yet ready to use**. I have a vague roadmap for this project, which is listed [below](#roadmap), but there's no timeline for it. If you're interested in this project, feel free to contact me. I'm open to suggestions and collaborations.
+A Python framework for Monte Carlo simulation of repairable systems, with focus on reliability analysis. farofa enables modeling devices subject to failure and repair processes using common lifetime distributions, including imperfect repair models such as the Generalized Renewal Process (GRP).
 
-## what does it do?
+> **Status:** Early development (pre-release). The API is unstable and subject to change.
 
-Right now, not much. It is possible to simulate a single device with failure and repair distributions of your choice (from the currently available ones in [distributions.py](farofa/distributions.py)). See [main.py](main.py) for an example.
+## Features
 
-But here's a brief overview of what I intend to include over the coming months.
+- **Single-device failure-repair simulation** with configurable failure and repair time distributions
+- **Fleet simulation** with `n` identical devices sharing `k` maintenance teams (FIFO queue)
+- **Lifetime distributions:** Exponential, Weibull (perfect repair), Weibull with minimal repair, Weibull GRP (Kijima Type I and Type II), Lognormal, Normal, Gamma
+- **Custom user-defined distributions** via callable factories
+- **Monte Carlo replication** for statistical analysis (failures, availability, MTTF, MTTR, utilization, queue/wait metrics)
+- **Numba JIT acceleration** for random variate generation
 
-In summary, this module should allow users to perform failure-repair simulations for multiple types of scenarios, such as considering different types of failure and repair time distributions, multiple devices in queueing systems, different priority classes, competing risks models. It should also allow users to create their own scenarios, in addition to using existing scenarios.
+## Installation
 
-Beyond the simulation itself, farofa should be able to output the most commonly used metrics in literature, for these types of problems. Of course, users should be able to include custom metrics as they desire. Moreover, farofa should be able to perform optimization in respect to some of the metrics it outputs.
+```bash
+git clone https://github.com/jmateusms/farofa.git
+cd farofa
+pip install -e .
+```
 
-## implementation
+## Quick start
 
-Concerning performance, Numba is being used to accelerate simulations. But since I intend to allow custom failure/repair behavior, as well as custom objective functions, I am looking into how to allow the user to choose whether or not to use Numba when importing or calling functions.
+### Single device
 
-## roadmap
+```python
+import farofa
 
-This is a general list of what I expect to include in this project. The order is more or less what I would expect to achieve. However, it is entirely possible that some features will be implemented sooner or later than expected. Also, I'm not able to work on this project as much as I'd like, so it may take a while to implement everything. Feel free to 
+device = farofa.SimpleDevice()
+device.set_failure_dist('exponential', 0.0001)  # rate = 0.0001 failures/hour
+device.set_repair_dist('exponential', 0.01)      # rate = 0.01 repairs/hour
+device.set_mission_time(8760)                     # 1 year in hours
 
-- [ ] "v0"
-  - [ ] Simple failure-repair simulation framework with a limited set of time distributions.
-  - [ ] Include most common distributions for failure and repair times.
-  - [ ] Allow usage of custom time distributions.
-  - [ ] Formatted output with most used metrics.
-- [ ] "v1"
-  - [ ] Include a queueing system, where multiple devices of the same behavior are simulated.
-  - [ ] Implement most common queue models.
-  - [ ] Allow usage of custom queue models.
-- [ ] "v2"
-  - [ ] Allow devices of different types in the same simulation.
-  - [ ] Include priority queue options.
-  - [ ] Increase the number of metrics.
-- [ ] "v3"
-  - [ ] Add an optimization framework.
-  - [ ] Allow setting custom objective functions, such as cost/profit/return/wealth functions.
-- [ ] "v4"
-  - [ ] Create a GUI.
-- [ ] "v5"
-  - [ ] Perform parameter estimation from failure data (there are existing tools that can do that).
+result = device.simulate(reps=10000)
+print(result)
+```
 
-## inspiration
+### Fleet with shared maintenance teams
 
-These are are some of the works that inspired the ideas for farofa. In the future, I would like farofa to be able to replicate the results of these works, or at least provide functionality to perform the most relevant parts of them.
+```python
+import farofa
 
-- Moura, M. C., Santana, J. M., Droguett, E. L., Lins, I. D., Guedes, B. N. (2017). Analysis of extended warranties for medical equipment: A Stackelberg game model using priority queues. Reliability Engineering \& System Safety, 168, 338–354. ([DOI](https://doi.org/10.1016/j.ress.2017.05.040)).
-- Santana, J. M., Santiago, R. L. V., Moura, M. D. C., Lins, I. D. (2018). Extended warranty of medical equipment subject to imperfect repairs : an approach based on generalized renewal process and Stackelberg game. Eksploatacja I Niezawodnosc, 20(4), 567–578. ([DOI](https://doi.org/10.17531/ein.2018.4.8)).
-- Yañez, M., Joglar, F., Modarres, M. (2002). Generalized renewal process for analysis of repairable systems with limited failure experience. Reliability Engineering and System Safety, 77(2), 167–180. ([DOI](https://doi.org/10.1016/S0951-8320(02)00044-3)).
-- Wang, Z. M., Yang, J. G. (2012). Numerical method for Weibull generalized renewal process and its applications in reliability analysis of NC machine tools. Computers and Industrial Engineering. ([DOI](https://doi.org/10.1016/j.cie.2012.06.019))
-- Moura, M. C., Droguett, E. L., Alves Firmino, P. R., Ferreira, R. J. (2014). A competing risk model for dependent and imperfect condition-based preventive and corrective maintenances. Proceedings of the Institution of Mechanical Engineers Part O-Journal of Risk and Reliability, 228(6), 590–605. ([DOI](https://doi.org/10.1177/1748006X14540878)).
+fleet = farofa.Fleet(n_devices=10, n_teams=2)
+fleet.set_failure_dist('weibull_grp', 200.0, 1.8, 0.4)  # imperfect repair
+fleet.set_repair_dist('lognormal', 2.0, 0.4)
+fleet.set_mission_time(8760)
+
+result = fleet.simulate(reps=200)
+print(result)
+```
+
+## Available distributions
+
+| Distribution | Function | Repair assumption | Parameters |
+|---|---|---|---|
+| Exponential | `exponential` | Memoryless (perfect repair) | `rate` |
+| Weibull | `weibull` | Perfect repair (age reset to 0) | `a` (scale), `b` (shape) |
+| Weibull (minimal repair) | `weibull_min` | Minimal repair (age preserved) | `t` (age), `a` (scale), `b` (shape) |
+| Weibull GRP | `weibull_grp` | Imperfect repair (Kijima Type I) | `t` (age), `a` (scale), `b` (shape), `q` (repair effectiveness, 0-1) |
+
+## Roadmap
+
+farofa is being developed incrementally. Below is the planned scope for each milestone.
+
+### v0 — Single device simulation
+
+Core simulation engine for a single repairable device.
+
+- [x] Failure-repair simulation loop with exponential and Weibull distributions
+- [x] Weibull GRP (Generalized Renewal Process) for imperfect repair modeling (Kijima Type I and Type II)
+- [x] Numba-accelerated random variate generation
+- [x] Support for custom (user-defined) lifetime distributions
+- [x] Lognormal, Normal, and Gamma distributions
+- [x] Output metrics: availability, mean time to failure (MTTF), mean time to repair (MTTR), failure rate
+- [x] Results object with summary statistics and raw simulation data
+- [x] Input validation and meaningful error messages
+- [x] Unit tests
+- [ ] CI
+
+### v1 — Queueing systems (current)
+
+Multiple devices sharing repair resources (maintenance teams).
+
+- [x] Queue with `n` identical devices and `k` repair servers (FIFO)
+- [x] Metrics: queue length, waiting time, server utilization
+- [ ] Additional queue disciplines (priority-based, custom)
+- [ ] Support for custom queue models
+
+### v2 — Heterogeneous systems
+
+Different device types in the same system.
+
+- [ ] Multiple device types with independent failure/repair behavior
+- [ ] Priority classes for repair scheduling
+- [ ] System-level metrics (e.g., system availability with redundancy)
+- [ ] Expanded set of output metrics
+
+### v3 — Optimization
+
+Find optimal maintenance policies and system configurations.
+
+- [ ] Optimization over maintenance parameters (e.g., preventive maintenance interval, number of repair teams)
+- [ ] Built-in objective functions: cost, availability, profit
+- [ ] Support for custom objective functions
+- [ ] Integration with scipy.optimize or similar
+
+### v4 — GUI
+
+Graphical interface for building and running simulations without code.
+
+### v5 — Parameter estimation
+
+Estimate distribution parameters from observed failure/repair data.
+
+- [ ] Maximum likelihood estimation for supported distributions
+- [ ] Goodness-of-fit testing
+- [ ] Integration with or reference to existing tools (e.g., `reliability` package)
+
+## Background
+
+farofa is inspired by research in reliability engineering, particularly repairable systems modeling with imperfect repair and queueing-based maintenance optimization. Key references:
+
+- Moura, M. C. et al. (2017). Analysis of extended warranties for medical equipment: A Stackelberg game model using priority queues. *Reliability Engineering & System Safety*, 168, 338–354. [DOI](https://doi.org/10.1016/j.ress.2017.05.040)
+- Santana, J. M. et al. (2018). Extended warranty of medical equipment subject to imperfect repairs. *Eksploatacja I Niezawodnosc*, 20(4), 567–578. [DOI](https://doi.org/10.17531/ein.2018.4.8)
+- Yañez, M. et al. (2002). Generalized renewal process for analysis of repairable systems with limited failure experience. *Reliability Engineering and System Safety*, 77(2), 167–180. [DOI](https://doi.org/10.1016/S0951-8320(02)00044-3)
+- Wang, Z. M. & Yang, J. G. (2012). Numerical method for Weibull generalized renewal process and its applications in reliability analysis of NC machine tools. *Computers and Industrial Engineering*. [DOI](https://doi.org/10.1016/j.cie.2012.06.019)
+- Moura, M. C. et al. (2014). A competing risk model for dependent and imperfect condition-based preventive and corrective maintenances. *Proceedings of the Institution of Mechanical Engineers Part O*, 228(6), 590–605. [DOI](https://doi.org/10.1177/1748006X14540878)
+
+## License
+
+GNU General Public License v3 — see [LICENSE](LICENSE).
