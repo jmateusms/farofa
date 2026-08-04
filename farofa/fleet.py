@@ -3,23 +3,9 @@ from collections import deque
 
 import numpy as np
 
-from .distributions import (
-    exponential, weibull, weibull_min, weibull_grp, weibull_grp2,
-    lognormal, normal, gamma,
-)
+from .distributions import DISTRIBUTIONS
 from .results import FleetSimulationResult
 from .utils import draw_positive
-
-DISTRIBUTIONS = {
-    'exponential': exponential,
-    'weibull': weibull,
-    'weibull_min': weibull_min,
-    'weibull_grp': weibull_grp,
-    'weibull_grp2': weibull_grp2,
-    'lognormal': lognormal,
-    'normal': normal,
-    'gamma': gamma,
-}
 
 _FAILURE = 0
 _REPAIR_DONE = 1
@@ -89,20 +75,23 @@ class Fleet:
         self.mission_time = float(mission_time)
 
     def _instantiate_samplers(self, spec, n):
-        # Stateful samplers (have .reset) need one instance per device so that
-        # virtual ages stay independent. Stateless samplers can be shared.
+        # One sampler instance per device: virtual ages stay independent and
+        # each instance can carry its own independent RNG stream.
         factory, args, kwargs = spec
-        first = factory(*args, **kwargs)
-        if hasattr(first, 'reset'):
-            return [first] + [factory(*args, **kwargs) for _ in range(n - 1)]
-        return [first] * n
+        return [factory(*args, **kwargs) for _ in range(n)]
 
-    def simulate(self, reps=1):
+    def simulate(self, reps=1, seed=None):
         """
         Run the fleet failure-repair simulation.
 
         Parameters:
             reps: number of Monte Carlo replications.
+            seed: optional int or numpy SeedSequence. When given, the run is
+                bit-for-bit reproducible (same environment). Every device's
+                failure and repair samplers get provably independent PCG64
+                streams via SeedSequence.spawn, so per-device trajectories do
+                not depend on fleet size or event interleaving. When None,
+                fresh OS entropy is used.
 
         Returns:
             FleetSimulationResult with per-device and fleet-level metrics.
@@ -128,6 +117,18 @@ class Fleet:
         failure_samplers = self._instantiate_samplers(self._failure_spec, N)
         repair_samplers = self._instantiate_samplers(self._repair_spec, N)
 
+        # Independent, reproducible stream per sampler: children [2d, 2d+1]
+        # seed device d's failure and repair samplers. Because spawn(n) is a
+        # deterministic prefix, device d's streams are the same regardless of
+        # how many further devices exist.
+        ss = seed if isinstance(seed, np.random.SeedSequence) else np.random.SeedSequence(seed)
+        children = ss.spawn(2 * N)
+        for d in range(N):
+            if hasattr(failure_samplers[d], 'set_rng'):
+                failure_samplers[d].set_rng(np.random.Generator(np.random.PCG64(children[2 * d])))
+            if hasattr(repair_samplers[d], 'set_rng'):
+                repair_samplers[d].set_rng(np.random.Generator(np.random.PCG64(children[2 * d + 1])))
+
         all_failure_counts = np.zeros((reps, N), dtype=np.int64)
         all_repair_counts = np.zeros((reps, N), dtype=np.int64)
         all_device_uptime = np.zeros((reps, N))
@@ -137,9 +138,9 @@ class Fleet:
         all_wait_times = []
 
         for r in range(reps):
-            # Reset any stateful samplers between reps. The dedup avoids resetting
-            # a shared stateless sampler N times (harmless, but wasteful).
-            for s in {id(s): s for s in failure_samplers + repair_samplers}.values():
+            # Reset stateful samplers (GRP virtual age) between reps; RNG
+            # streams deliberately continue so replications are independent.
+            for s in failure_samplers + repair_samplers:
                 if hasattr(s, 'reset'):
                     s.reset()
 

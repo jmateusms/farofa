@@ -13,12 +13,13 @@ import numpy as np
 import pytest
 
 from farofa.device import SimpleDevice
-from farofa.distributions import _sample_grp, normal, weibull_grp
+from farofa.distributions import _TINY, _grp_inverse, normal, weibull_grp
 from farofa.fleet import Fleet
 
 
-def draws(v, a, b, n):
-    return np.array([_sample_grp(v, a, b) for _ in range(n)])
+def draws(v, a, b, n, seed=20260804):
+    u = np.maximum(np.random.default_rng(seed).random(n), _TINY)
+    return np.array([_grp_inverse(v, a, b, ui) for ui in u.tolist()])
 
 
 class TestGRPPositivity:

@@ -28,7 +28,7 @@ class TestMTTFRenewalEstimator:
         device.set_failure_dist('exponential', 1e-4)
         device.set_repair_dist('exponential', 0.01)
         device.set_mission_time(8760)
-        result = device.simulate(reps=4000)
+        result = device.simulate(reps=4000, seed=101)
         assert result.mttf == pytest.approx(10000.0, rel=0.08)
 
     def test_mttr_matches_analytical(self):
@@ -36,7 +36,7 @@ class TestMTTFRenewalEstimator:
         device.set_failure_dist('exponential', 1e-3)
         device.set_repair_dist('exponential', 0.01)  # true MTTR = 100
         device.set_mission_time(8760)
-        result = device.simulate(reps=2000)
+        result = device.simulate(reps=2000, seed=102)
         assert result.mttr == pytest.approx(100.0, rel=0.08)
 
     def test_availability_matches_steady_state(self):
@@ -45,7 +45,7 @@ class TestMTTFRenewalEstimator:
         device.set_failure_dist('exponential', 1e-3)
         device.set_repair_dist('exponential', 1e-2)
         device.set_mission_time(50000)
-        result = device.simulate(reps=500)
+        result = device.simulate(reps=500, seed=103)
         assert result.availability == pytest.approx(10.0 / 11.0, rel=0.02)
 
 
@@ -86,7 +86,7 @@ class TestFleetMTTFMTTR:
         fleet.set_failure_dist('exponential', 2e-3)  # MTTF = 500
         fleet.set_repair_dist('exponential', 5e-2)   # MTTR = 20
         fleet.set_mission_time(5000)
-        result = fleet.simulate(reps=300)
+        result = fleet.simulate(reps=300, seed=104)
         assert result.mttf == pytest.approx(500.0, rel=0.08)
         assert result.mttr == pytest.approx(20.0, rel=0.08)
 

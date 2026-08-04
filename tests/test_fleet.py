@@ -94,50 +94,47 @@ class TestFleetBasic:
 
 
 class TestFleetParityWithSimpleDevice:
-    """N=1, K=1 fleet should statistically match a SimpleDevice."""
+    """An N=1, K=1 fleet must reproduce SimpleDevice *exactly* under the same
+    seed: both spawn the identical pair of child streams from the seed and
+    consume draws in the same order, so trajectories are bit-identical (times
+    agree to float summation-order differences)."""
 
-    def test_availability_matches(self):
-        T = 5000.0
-        reps = 500
-
-        np.random.seed(42)
+    def _pair(self, seed, failure=('exponential', 0.005), repair=('exponential', 0.1),
+              T=5000.0, reps=200):
         device = SimpleDevice()
-        device.set_failure_dist('exponential', 0.005)
-        device.set_repair_dist('exponential', 0.1)
+        device.set_failure_dist(*failure)
+        device.set_repair_dist(*repair)
         device.set_mission_time(T)
-        dev_result = device.simulate(reps=reps)
+        dev_result = device.simulate(reps=reps, seed=seed)
 
-        np.random.seed(42)
         fleet = Fleet(n_devices=1, n_teams=1)
-        fleet.set_failure_dist('exponential', 0.005)
-        fleet.set_repair_dist('exponential', 0.1)
+        fleet.set_failure_dist(*failure)
+        fleet.set_repair_dist(*repair)
         fleet.set_mission_time(T)
-        fleet_result = fleet.simulate(reps=reps)
+        fleet_result = fleet.simulate(reps=reps, seed=seed)
+        return dev_result, fleet_result
 
-        # Both should converge to the same theoretical availability:
-        # A = (1/mu) / (1/mu + 1/nu) = nu / (mu + nu) where mu = failure rate, nu = repair rate
-        # = 0.1 / (0.105) ≈ 0.9524
-        assert abs(dev_result.availability - fleet_result.fleet_availability) < 0.01
+    def test_failure_counts_identical(self):
+        dev, fl = self._pair(seed=42)
+        np.testing.assert_array_equal(dev.failure_counts, fl.failure_counts.ravel())
+        np.testing.assert_array_equal(dev.repair_counts, fl.repair_counts.ravel())
 
-    def test_failure_counts_comparable(self):
-        T = 5000.0
-        reps = 500
+    def test_uptime_downtime_match(self):
+        dev, fl = self._pair(seed=42)
+        np.testing.assert_allclose(dev.total_uptime, fl.device_uptime.ravel(), rtol=1e-9)
+        np.testing.assert_allclose(dev.total_downtime, fl.device_downtime.ravel(), rtol=1e-9)
 
-        np.random.seed(7)
-        device = SimpleDevice()
-        device.set_failure_dist('exponential', 0.005)
-        device.set_repair_dist('exponential', 0.1)
-        device.set_mission_time(T)
-        dev_result = device.simulate(reps=reps)
+    def test_parity_holds_for_stateful_grp(self):
+        dev, fl = self._pair(seed=7, failure=('weibull_grp', 200.0, 1.8, 0.4),
+                             repair=('lognormal', 2.0, 0.4), T=8760.0, reps=100)
+        np.testing.assert_array_equal(dev.failure_counts, fl.failure_counts.ravel())
+        np.testing.assert_allclose(dev.total_uptime, fl.device_uptime.ravel(), rtol=1e-9)
 
-        np.random.seed(7)
-        fleet = Fleet(n_devices=1, n_teams=1)
-        fleet.set_failure_dist('exponential', 0.005)
-        fleet.set_repair_dist('exponential', 0.1)
-        fleet.set_mission_time(T)
-        fleet_result = fleet.simulate(reps=reps)
-
-        assert abs(dev_result.mean_failures - fleet_result.mean_failures) / dev_result.mean_failures < 0.1
+    def test_availability_matches_theory(self):
+        # lambda=0.005, mu=0.1: steady-state A = mu/(lambda+mu) ~= 0.9524
+        dev, fl = self._pair(seed=11, reps=500)
+        assert abs(dev.availability - 0.9524) < 0.01
+        assert abs(fl.fleet_availability - 0.9524) < 0.01
 
 
 class TestFleetQueueing:
@@ -162,36 +159,29 @@ class TestFleetQueueing:
         assert result.mean_wait_time > 0.0
 
     def test_more_teams_increase_availability(self):
-        # Holding everything else constant, more teams should not hurt availability.
-        kwargs = dict(failure_rate=0.02, repair_rate=0.05, T=1500, reps=30)
-
+        # Same seed = common random numbers per device stream, so more teams
+        # must not hurt availability.
         def avail(k):
             fleet = Fleet(n_devices=6, n_teams=k)
-            fleet.set_failure_dist('exponential', kwargs['failure_rate'])
-            fleet.set_repair_dist('exponential', kwargs['repair_rate'])
-            fleet.set_mission_time(kwargs['T'])
-            return fleet.simulate(reps=kwargs['reps']).fleet_availability
+            fleet.set_failure_dist('exponential', 0.02)
+            fleet.set_repair_dist('exponential', 0.05)
+            fleet.set_mission_time(1500)
+            return fleet.simulate(reps=30, seed=1).fleet_availability
 
-        np.random.seed(1)
-        a1 = avail(1)
-        np.random.seed(1)
-        a6 = avail(6)
-        assert a6 >= a1
+        assert avail(6) >= avail(1)
 
     def test_utilization_higher_under_load(self):
-        np.random.seed(0)
         light = Fleet(n_devices=3, n_teams=3)
         light.set_failure_dist('exponential', 0.005)
         light.set_repair_dist('exponential', 0.5)
         light.set_mission_time(1000)
-        u_light = light.simulate(reps=20).server_utilization
+        u_light = light.simulate(reps=20, seed=0).server_utilization
 
-        np.random.seed(0)
         heavy = Fleet(n_devices=10, n_teams=2)
         heavy.set_failure_dist('exponential', 0.05)
         heavy.set_repair_dist('exponential', 0.05)
         heavy.set_mission_time(1000)
-        u_heavy = heavy.simulate(reps=20).server_utilization
+        u_heavy = heavy.simulate(reps=20, seed=0).server_utilization
 
         assert u_heavy > u_light
 

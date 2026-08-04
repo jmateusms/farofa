@@ -6,9 +6,11 @@ from farofa.distributions import (
 )
 
 
-def generate_samples(factory, args, n=10000):
-    """Generate n samples from a distribution factory."""
+def generate_samples(factory, args, n=10000, seed=20260804):
+    """Generate n samples from a distribution factory (seeded: deterministic)."""
     gen = factory(*args)
+    if hasattr(gen, 'set_rng'):
+        gen.set_rng(np.random.default_rng(seed))
     return np.array([gen() for _ in range(n)])
 
 

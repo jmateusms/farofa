@@ -15,7 +15,7 @@ def run(n_devices, n_teams, reps=200):
     fleet.set_mission_time(8760)  # 1 year
 
     start = time()
-    result = fleet.simulate(reps=reps)
+    result = fleet.simulate(reps=reps, seed=42)
     elapsed = time() - start
     return result, elapsed
 

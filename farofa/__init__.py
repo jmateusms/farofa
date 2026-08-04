@@ -1,4 +1,3 @@
-from .utils import safe_random
 from .distributions import (
     exponential, weibull, weibull_min, weibull_grp, weibull_grp2,
     lognormal, normal, gamma,

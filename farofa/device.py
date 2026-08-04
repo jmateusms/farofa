@@ -1,21 +1,8 @@
 import numpy as np
-from .distributions import (
-    exponential, weibull, weibull_min, weibull_grp, weibull_grp2,
-    lognormal, normal, gamma,
-)
+
+from .distributions import DISTRIBUTIONS
 from .results import SimulationResult
 from .utils import draw_positive
-
-DISTRIBUTIONS = {
-    'exponential': exponential,
-    'weibull': weibull,
-    'weibull_min': weibull_min,
-    'weibull_grp': weibull_grp,
-    'weibull_grp2': weibull_grp2,
-    'lognormal': lognormal,
-    'normal': normal,
-    'gamma': gamma,
-}
 
 
 class SimpleDevice:
@@ -27,21 +14,14 @@ class SimpleDevice:
         device.set_failure_dist('exponential', 0.001)
         device.set_repair_dist('exponential', 0.1)
         device.set_mission_time(8760)
-        result = device.simulate(reps=1000)
+        result = device.simulate(reps=1000, seed=42)  # seed optional
         print(result)
     """
 
     def __init__(self):
         self.operational = True
-
         self.failure_dist = None
-        self.failure_args = ()
-        self.failure_kwargs = {}
-
         self.repair_dist = None
-        self.repair_args = ()
-        self.repair_kwargs = {}
-
         self.mission_time = None
 
     def set_failure_dist(self, dist, *args, **kwargs):
@@ -66,8 +46,6 @@ class SimpleDevice:
             self.failure_dist = DISTRIBUTIONS[dist](*args, **kwargs)
         else:
             raise TypeError('dist must be a string name or a callable.')
-        self.failure_args = args
-        self.failure_kwargs = kwargs
 
     def set_repair_dist(self, dist, *args, **kwargs):
         """
@@ -89,8 +67,6 @@ class SimpleDevice:
             self.repair_dist = DISTRIBUTIONS[dist](*args, **kwargs)
         else:
             raise TypeError('dist must be a string name or a callable.')
-        self.repair_args = args
-        self.repair_kwargs = kwargs
 
     def set_mission_time(self, mission_time):
         """Set the mission time (total simulation duration per replication)."""
@@ -109,12 +85,16 @@ class SimpleDevice:
     def generate_repair(self):
         return draw_positive(self.repair_dist, 'repair')
 
-    def simulate(self, reps=1):
+    def simulate(self, reps=1, seed=None):
         """
         Run the failure-repair simulation.
 
         Parameters:
             reps: number of Monte Carlo replications.
+            seed: optional int or numpy SeedSequence. When given, the run is
+                bit-for-bit reproducible (same environment): the failure and
+                repair samplers each get an independent PCG64 stream spawned
+                from this seed. When None, fresh OS entropy is used.
 
         Returns:
             SimulationResult with detailed metrics.
@@ -132,6 +112,13 @@ class SimpleDevice:
             raise ValueError('Repair distribution not set. Call set_repair_dist() first.')
         if self.mission_time is None:
             raise ValueError('Mission time not set. Call set_mission_time() first.')
+
+        ss = seed if isinstance(seed, np.random.SeedSequence) else np.random.SeedSequence(seed)
+        failure_ss, repair_ss = ss.spawn(2)
+        if hasattr(self.failure_dist, 'set_rng'):
+            self.failure_dist.set_rng(np.random.Generator(np.random.PCG64(failure_ss)))
+        if hasattr(self.repair_dist, 'set_rng'):
+            self.repair_dist.set_rng(np.random.Generator(np.random.PCG64(repair_ss)))
 
         T = self.mission_time
         failure_counts = []

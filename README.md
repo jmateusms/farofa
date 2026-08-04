@@ -13,7 +13,8 @@ A Python framework for Monte Carlo simulation of repairable systems, with focus 
 - **Lifetime distributions:** Exponential, Weibull (perfect repair), Weibull with minimal repair, Weibull GRP (Kijima Type I and Type II), Lognormal, Normal, Gamma
 - **Custom user-defined distributions** via callable factories
 - **Monte Carlo replication** for statistical analysis (failures, availability, MTTF, MTTR, utilization, queue/wait metrics)
-- **Numba JIT acceleration** for random variate generation
+- **Reproducible by construction:** `simulate(seed=...)` gives bit-for-bit repeatable runs (same environment), with provably independent per-device PCG64 streams via `numpy.random.SeedSequence`
+- **Vectorized random variate generation** (buffered batch draws through NumPy's PCG64 generator)
 
 ## Installation
 
@@ -53,6 +54,19 @@ result = fleet.simulate(reps=200)
 print(result)
 ```
 
+### Reproducible runs
+
+Pass `seed=` to `simulate()` to make a run bit-for-bit reproducible (in the
+same environment). Each sampler — and each device in a fleet — draws from its
+own independent PCG64 stream spawned from the seed, so a device's trajectory
+does not depend on fleet size or event interleaving:
+
+```python
+r1 = device.simulate(reps=10000, seed=42)
+r2 = device.simulate(reps=10000, seed=42)
+# r1 and r2 are identical, sample by sample
+```
+
 ## Available distributions
 
 | Distribution | Function | Repair assumption | Parameters |
@@ -76,7 +90,7 @@ Core simulation engine for a single repairable device.
 
 - [x] Failure-repair simulation loop with exponential and Weibull distributions
 - [x] Weibull GRP (Generalized Renewal Process) for imperfect repair modeling (Kijima Type I and Type II)
-- [x] Numba-accelerated random variate generation
+- [x] Reproducible, vectorized random variate generation (PCG64, seeded per-device streams)
 - [x] Support for custom (user-defined) lifetime distributions
 - [x] Lognormal, Normal, and Gamma distributions
 - [x] Output metrics: availability, mean time to failure (MTTF), mean time to repair (MTTR), failure rate
