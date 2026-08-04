@@ -238,8 +238,9 @@ class TestFleetSimulationResultRepr:
         s = result.summary()
         expected = {
             'mission_time', 'n_devices', 'n_teams', 'replications',
-            'mean_failures', 'mean_repairs', 'fleet_availability',
-            'server_utilization', 'mean_wait_time', 'max_queue_observed',
+            'mean_failures', 'mean_repairs', 'mttf', 'mttr',
+            'fleet_availability', 'server_utilization', 'mean_wait_time',
+            'max_queue_observed',
         }
         assert set(s.keys()) == expected
 

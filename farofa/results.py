@@ -44,24 +44,43 @@ class SimulationResult:
 
     @property
     def std_failures(self):
-        """Standard deviation of failure counts across replications."""
+        """Standard deviation of failure counts across replications (nan if reps < 2)."""
+        if self.reps < 2:
+            return np.nan
         return np.std(self.failure_counts, ddof=1)
 
     @property
     def mttf(self):
-        """Mean time to failure (averaged across all replications)."""
-        all_ttf = np.concatenate(self.uptimes) if self.uptimes else np.array([])
-        if len(all_ttf) == 0:
-            return np.inf
-        return np.mean(all_ttf)
+        """Mean time to failure: total operating time / total failures (renewal estimator).
+
+        Averaging only the completed inter-failure intervals would be length-biased
+        in a fixed mission window (inspection paradox): intervals still running at
+        mission end are censored, and long intervals are censored more often, so the
+        naive mean underestimates badly. The renewal estimator
+        sum(total_uptime) / sum(failure_counts) is consistent for the true MTTF.
+        Raw completed intervals remain available in `.uptimes`.
+
+        Returns nan if no failures were observed.
+        """
+        total_failures = self.failure_counts.sum()
+        if total_failures == 0:
+            return np.nan
+        return float(self.total_uptime.sum() / total_failures)
 
     @property
     def mttr(self):
-        """Mean time to repair (averaged across all replications)."""
-        all_ttr = np.concatenate(self.downtimes) if self.downtimes else np.array([])
-        if len(all_ttr) == 0:
-            return 0.0
-        return np.mean(all_ttr)
+        """Mean time to repair: total repair time / total completed repairs (renewal estimator).
+
+        Same rationale as `mttf`. The numerator includes time spent in a repair
+        still in progress at mission end. Raw completed repair durations remain
+        available in `.downtimes`.
+
+        Returns nan if no repairs were completed.
+        """
+        total_repairs = self.repair_counts.sum()
+        if total_repairs == 0:
+            return np.nan
+        return float(self.total_downtime.sum() / total_repairs)
 
     @property
     def failure_rate(self):
@@ -160,6 +179,33 @@ class FleetSimulationResult:
         return float(self.repair_counts.sum(axis=1).mean())
 
     @property
+    def mttf(self):
+        """Mean time to failure: total device operating time / total failures.
+
+        Renewal estimator over the whole fleet (see SimulationResult.mttf for
+        why naive interval averaging is length-biased). Returns nan if no
+        failures were observed.
+        """
+        total_failures = self.failure_counts.sum()
+        if total_failures == 0:
+            return np.nan
+        return float(self.device_uptime.sum() / total_failures)
+
+    @property
+    def mttr(self):
+        """Mean active repair time per completed repair.
+
+        Uses total team-busy time (active repair only) over completed repairs.
+        Note this excludes queue waiting time: a device's downtime is
+        wait + repair, so sum(device_downtime)/failures >= mttr whenever
+        repairs queue. Returns nan if no repairs were completed.
+        """
+        total_repairs = self.repair_counts.sum()
+        if total_repairs == 0:
+            return np.nan
+        return float(self.busy_team_hours.sum() / total_repairs)
+
+    @property
     def mean_wait_time(self):
         """Mean wait time before repair starts, averaged over all repairs that started."""
         if not any(len(w) for w in self.wait_times):
@@ -181,6 +227,8 @@ class FleetSimulationResult:
             'replications': self.reps,
             'mean_failures': self.mean_failures,
             'mean_repairs': self.mean_repairs,
+            'mttf': self.mttf,
+            'mttr': self.mttr,
             'fleet_availability': self.fleet_availability,
             'server_utilization': self.server_utilization,
             'mean_wait_time': self.mean_wait_time,
@@ -194,6 +242,8 @@ class FleetSimulationResult:
             f"{s['replications']} replications, T={s['mission_time']})",
             f"  Mean fleet failures:  {s['mean_failures']:.4f}",
             f"  Mean fleet repairs:   {s['mean_repairs']:.4f}",
+            f"  MTTF:                 {s['mttf']:.4f}",
+            f"  MTTR (active):        {s['mttr']:.4f}",
             f"  Fleet availability:   {s['fleet_availability']:.6f}",
             f"  Server utilization:   {s['server_utilization']:.6f}",
             f"  Mean wait time:       {s['mean_wait_time']:.4f}",
