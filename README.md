@@ -59,8 +59,12 @@ print(result)
 |---|---|---|---|
 | Exponential | `exponential` | Memoryless (perfect repair) | `rate` |
 | Weibull | `weibull` | Perfect repair (age reset to 0) | `a` (scale), `b` (shape) |
-| Weibull (minimal repair) | `weibull_min` | Minimal repair (age preserved) | `t` (age), `a` (scale), `b` (shape) |
-| Weibull GRP | `weibull_grp` | Imperfect repair (Kijima Type I) | `t` (age), `a` (scale), `b` (shape), `q` (repair effectiveness, 0-1) |
+| Weibull (minimal repair) | `weibull_min` | Minimal repair (age preserved; stateful) | `a` (scale), `b` (shape) |
+| Weibull GRP (Kijima I) | `weibull_grp` | Imperfect repair, `v_i = v_{i-1} + q·x_i` (stateful) | `a` (scale), `b` (shape), `q` (repair effectiveness, 0–1) |
+| Weibull GRP (Kijima II) | `weibull_grp2` | Imperfect repair, `v_i = q·(v_{i-1} + x_i)` (stateful) | `a` (scale), `b` (shape), `q` (repair effectiveness, 0–1) |
+| Lognormal | `lognormal` | — (typically used for repair times) | `mu`, `sigma` (log-scale) |
+| Normal (truncated at 0) | `normal` | — (resampled until positive) | `mu`, `sigma` |
+| Gamma | `gamma` | — | `shape`, `scale` |
 
 ## Roadmap
 

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68.0", "setuptools-scm"]
+requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "farofa"
-version = "0.1.0-dev"
+version = "0.2.0.dev0"
 description = "Failure And Repair simulation Optimization Framework"
 readme = "README.md"
 license = "GPL-3.0-or-later"
