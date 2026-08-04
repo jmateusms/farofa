@@ -8,6 +8,7 @@ from .distributions import (
     lognormal, normal, gamma,
 )
 from .results import FleetSimulationResult
+from .utils import draw_positive
 
 DISTRIBUTIONS = {
     'exponential': exponential,
@@ -156,7 +157,7 @@ class Fleet:
             heap = []
             counter = 0
             for d in range(N):
-                ttf = failure_samplers[d]()
+                ttf = draw_positive(failure_samplers[d], 'failure')
                 heapq.heappush(heap, (ttf, counter, _FAILURE, d))
                 counter += 1
 
@@ -179,7 +180,7 @@ class Fleet:
 
                     if team_busy < K:
                         team_busy += 1
-                        ttr = repair_samplers[d]()
+                        ttr = draw_positive(repair_samplers[d], 'repair')
                         heapq.heappush(heap, (t + ttr, counter, _REPAIR_DONE, d))
                         counter += 1
                         wait_times.append(0.0)
@@ -199,11 +200,11 @@ class Fleet:
                         d_next, failed_at = queue.popleft()
                         wait_times.append(t - failed_at)
                         team_busy += 1
-                        ttr = repair_samplers[d_next]()
+                        ttr = draw_positive(repair_samplers[d_next], 'repair')
                         heapq.heappush(heap, (t + ttr, counter, _REPAIR_DONE, d_next))
                         counter += 1
 
-                    ttf = failure_samplers[d]()
+                    ttf = draw_positive(failure_samplers[d], 'failure')
                     if t + ttf < T:
                         heapq.heappush(heap, (t + ttf, counter, _FAILURE, d))
                         counter += 1

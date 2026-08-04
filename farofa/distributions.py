@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 from numba import njit, float64
 from .utils import safe_random
@@ -44,21 +46,48 @@ def weibull(a, b):
     return weibull_rvs
 
 
+# Smallest positive normal double: clamp target when the conditional
+# inter-failure time genuinely underflows (astronomically large virtual age).
+_TINY = np.finfo(np.float64).tiny
+
+
 @njit(float64(float64, float64, float64))
 def _sample_grp(v, a, b):
     """
     Inversion-method sampler for the next inter-failure time given virtual age v.
     Derived from the conditional Weibull CDF:
         F(x | v) = 1 - exp[(v/a)^b - ((x+v)/a)^b]
-    Solving F(x | v) = 1 - u gives:
+    Solving F(x | v) = 1 - u gives, in exact arithmetic:
         x = a * [(v/a)^b - ln(u)]^(1/b) - v
-    Formula is identical for Kijima Type I and Type II — only the virtual age
-    update rule between failures differs (handled by the caller).
+    That textbook form is numerically catastrophic for large v: the subtraction
+    cancels (returning zero or negative times) and (v/a)^b overflows. With
+    w = -ln(u) / (v/a)^b, the identity
+        x = v * [(1 + w)^(1/b) - 1] = v * expm1(log1p(w) / b)
+    is cancellation-free; w is computed in log space so (v/a)^b never overflows,
+    with asymptotic branches where log1p/expm1 would themselves saturate.
+    The formula is identical for Kijima Type I and Type II — only the virtual
+    age update rule between failures differs (handled by the caller).
 
     Reference: Yañez et al. (2002), Reliability Engineering & System Safety, 77.
     """
     u = safe_random()
-    return a * ((v / a) ** b - np.log(u)) ** (1.0 / b) - v
+    neg_log_u = -np.log(u)  # > 0 since safe_random() returns u in (0, 1)
+    if v <= 0.0:
+        x = a * neg_log_u ** (1.0 / b)
+    else:
+        log_w = np.log(neg_log_u) - b * np.log(v / a)
+        if log_w > 30.0:
+            # w >= ~1e13: v is negligible against the fresh draw; the direct
+            # form has no cancellation here (ratio to v is at least e^(30/b)).
+            x = a * neg_log_u ** (1.0 / b) - v
+        elif log_w < -30.0:
+            # w <= ~1e-13: expm1(log1p(w)/b) == w/b to double precision.
+            x = v * np.exp(log_w) / b
+        else:
+            x = v * np.expm1(np.log1p(np.exp(log_w)) / b)
+    if x > 0.0:
+        return x
+    return _TINY
 
 
 def weibull_min(a, b):
@@ -190,24 +219,41 @@ def lognormal(mu, sigma):
 
 def normal(mu, sigma):
     """
-    Instantiates a normal random variable generator.
-    Note: can generate negative values — use with care for time distributions.
+    Instantiates a normal random variable generator, truncated at zero.
+
+    Negative variates would run simulated time backwards, so draws are
+    rejected until positive (i.e., this samples the normal distribution
+    conditioned on X > 0). The truncation is negligible when mu >> sigma;
+    the factory refuses parameters whose positive mass is vanishingly small.
 
     Parameters:
-        mu: mean
-        sigma: standard deviation
+        mu: mean (of the untruncated distribution)
+        sigma: standard deviation (of the untruncated distribution)
 
     Returns:
-        A callable that generates normally distributed random values.
+        A callable that generates positive, normally distributed random values.
     """
+    if sigma <= 0:
+        raise ValueError('sigma must be greater than 0.')
+    # P(X > 0) for the untruncated normal; refuse practically-degenerate cases
+    # where rejection sampling would loop (nearly) forever.
+    p_positive = 0.5 * math.erfc(-mu / (sigma * math.sqrt(2.0)))
+    if p_positive < 1e-6:
+        raise ValueError(
+            f'normal(mu={mu}, sigma={sigma}) has practically no positive mass '
+            f'(P(X>0)={p_positive:.2e}); failure/repair times must be positive.'
+        )
 
     @njit
     def normal_rvs(mu=mu, sigma=sigma):
-        # Box-Muller transform
-        u1 = safe_random()
-        u2 = safe_random()
-        z = np.sqrt(-2.0 * np.log(u1)) * np.cos(2.0 * np.pi * u2)
-        return mu + sigma * z
+        # Box-Muller transform, rejecting non-positive draws (truncation at 0)
+        while True:
+            u1 = safe_random()
+            u2 = safe_random()
+            z = np.sqrt(-2.0 * np.log(u1)) * np.cos(2.0 * np.pi * u2)
+            x = mu + sigma * z
+            if x > 0.0:
+                return x
 
     return normal_rvs
 

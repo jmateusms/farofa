@@ -4,6 +4,7 @@ from .distributions import (
     lognormal, normal, gamma,
 )
 from .results import SimulationResult
+from .utils import draw_positive
 
 DISTRIBUTIONS = {
     'exponential': exponential,
@@ -103,10 +104,10 @@ class SimpleDevice:
         self.mission_time = float(mission_time)
 
     def generate_failure(self):
-        return self.failure_dist()
+        return draw_positive(self.failure_dist, 'failure')
 
     def generate_repair(self):
-        return self.repair_dist()
+        return draw_positive(self.repair_dist, 'repair')
 
     def simulate(self, reps=1):
         """
