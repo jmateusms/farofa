@@ -1,9 +1,11 @@
 """Reproducibility tests (roadmap Phase 1 exit criteria).
 
 A disclosed seed must reproduce a run bit-for-bit in the same environment,
-and every device in a fleet must have an independent stream: device d's
-trajectory cannot depend on how many other devices exist or on event
-interleaving (SeedSequence.spawn children are a deterministic prefix).
+and every device in a fleet must have an independent stream: the variate
+sequence device d consumes depends only on the seed and d, never on fleet
+size (SeedSequence.spawn children are a deterministic prefix). Full
+trajectories are additionally fleet-size-invariant when there is no repair
+queueing (n_teams >= n_devices) — with queueing, waits shift event times.
 """
 import numpy as np
 
@@ -67,6 +69,23 @@ class TestDeviceSeeding:
         r1 = make_device().simulate(reps=50, seed=np.random.SeedSequence(99))
         r2 = make_device().simulate(reps=50, seed=ss)
         np.testing.assert_array_equal(r1.total_uptime, r2.total_uptime)
+
+    def test_seed_sequence_instance_reuse_is_reproducible(self):
+        # Regression: simulate() must not spawn from (and thereby mutate) the
+        # caller's SeedSequence — reusing one instance must give identical runs.
+        ss = np.random.SeedSequence(99)
+        r1 = make_device().simulate(reps=50, seed=ss)
+        r2 = make_device().simulate(reps=50, seed=ss)
+        np.testing.assert_array_equal(r1.total_uptime, r2.total_uptime)
+        np.testing.assert_array_equal(r1.failure_counts, r2.failure_counts)
+        assert ss.n_children_spawned == 0  # caller's object left untouched
+
+    def test_seed_sequence_reuse_fleet(self):
+        ss = np.random.SeedSequence(7)
+        r1 = make_fleet(4, 2).simulate(reps=20, seed=ss)
+        r2 = make_fleet(4, 2).simulate(reps=20, seed=ss)
+        np.testing.assert_array_equal(r1.device_uptime, r2.device_uptime)
+        assert ss.n_children_spawned == 0
 
 
 class TestFleetSeeding:

@@ -30,6 +30,13 @@ class TestFleetSetup:
         with pytest.raises(ValueError, match="Unknown distribution"):
             fleet.set_failure_dist('not_a_dist', 1.0)
 
+    def test_prebuilt_sampler_instance_rejected(self):
+        from farofa.distributions import exponential
+
+        fleet = Fleet(n_devices=2, n_teams=1)
+        with pytest.raises(TypeError, match='factory'):
+            fleet.set_failure_dist(exponential(0.01))
+
     def test_set_mission_time_validation(self):
         fleet = Fleet(n_devices=1, n_teams=1)
         with pytest.raises(ValueError):

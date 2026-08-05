@@ -3,9 +3,9 @@ from collections import deque
 
 import numpy as np
 
-from .distributions import DISTRIBUTIONS
+from .distributions import DISTRIBUTIONS, Sampler
 from .results import FleetSimulationResult
-from .utils import draw_positive
+from .utils import draw_positive, spawn_seed_sequence
 
 _FAILURE = 0
 _REPAIR_DONE = 1
@@ -42,6 +42,13 @@ class Fleet:
         self.mission_time = None
 
     def _resolve_spec(self, dist, args, kwargs):
+        if isinstance(dist, Sampler):
+            raise TypeError(
+                'pass the distribution factory and its parameters, e.g. '
+                "set_failure_dist('exponential', 0.01) or "
+                'set_failure_dist(farofa.exponential, 0.01) — not an '
+                'already-constructed sampler instance.'
+            )
         if callable(dist):
             factory = dist
         elif isinstance(dist, str):
@@ -56,11 +63,19 @@ class Fleet:
         return (factory, args, kwargs)
 
     def set_failure_dist(self, dist, *args, **kwargs):
-        """Set the failure time distribution shared by all devices."""
+        """Set the failure time distribution shared by all devices.
+
+        ``dist`` is a name or a callable *factory* returning a new sampler
+        per call (one instance is created per device).
+        """
         self._failure_spec = self._resolve_spec(dist, args, kwargs)
 
     def set_repair_dist(self, dist, *args, **kwargs):
-        """Set the repair time distribution shared by all devices."""
+        """Set the repair time distribution shared by all devices.
+
+        ``dist`` is a name or a callable *factory* returning a new sampler
+        per call (one instance is created per device).
+        """
         self._repair_spec = self._resolve_spec(dist, args, kwargs)
 
     def set_mission_time(self, mission_time):
@@ -89,9 +104,12 @@ class Fleet:
             seed: optional int or numpy SeedSequence. When given, the run is
                 bit-for-bit reproducible (same environment). Every device's
                 failure and repair samplers get provably independent PCG64
-                streams via SeedSequence.spawn, so per-device trajectories do
-                not depend on fleet size or event interleaving. When None,
-                fresh OS entropy is used.
+                streams via SeedSequence.spawn, so the *variate sequence*
+                assigned to device d depends only on the seed and d — never
+                on fleet size. Full trajectories are additionally identical
+                across fleet sizes only when no repair queueing occurs
+                (n_teams >= n_devices); with fewer teams than devices, queue
+                waits shift event times. When None, fresh OS entropy is used.
 
         Returns:
             FleetSimulationResult with per-device and fleet-level metrics.
@@ -119,10 +137,10 @@ class Fleet:
 
         # Independent, reproducible stream per sampler: children [2d, 2d+1]
         # seed device d's failure and repair samplers. Because spawn(n) is a
-        # deterministic prefix, device d's streams are the same regardless of
-        # how many further devices exist.
-        ss = seed if isinstance(seed, np.random.SeedSequence) else np.random.SeedSequence(seed)
-        children = ss.spawn(2 * N)
+        # deterministic prefix, device d's *streams* are the same regardless
+        # of how many further devices exist (trajectories also match across
+        # fleet sizes when K >= N, i.e. when no queueing perturbs timing).
+        children = spawn_seed_sequence(seed, 2 * N)
         for d in range(N):
             if hasattr(failure_samplers[d], 'set_rng'):
                 failure_samplers[d].set_rng(np.random.Generator(np.random.PCG64(children[2 * d])))

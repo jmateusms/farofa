@@ -56,10 +56,19 @@ class SimulationResult:
         Averaging only the completed inter-failure intervals would be length-biased
         in a fixed mission window (inspection paradox): intervals still running at
         mission end are censored, and long intervals are censored more often, so the
-        naive mean underestimates badly. The renewal estimator
-        sum(total_uptime) / sum(failure_counts) is consistent for the true MTTF.
-        Raw completed intervals remain available in `.uptimes`.
+        naive mean underestimates badly (~3x low when true MTTF ~ mission time).
+        The renewal estimator sum(total_uptime) / sum(failure_counts) has no such
+        bias, but its remaining accuracy depends on the failure law:
 
+        - exponential failures: unbiased at any mission time (constant hazard
+          makes E[failures] = lambda * E[uptime] an identity);
+        - non-exponential failures: the censored final interval leaves a window
+          bias of order MTTF/T that vanishes as T grows — e.g. for Weibull
+          shape 3, roughly +86% at T = MTTF, +16% at T = 3*MTTF, +2% at
+          T = 20*MTTF. Use a mission time well beyond the mean lifetime when
+          estimating a non-exponential MTTF.
+
+        Raw completed intervals remain available in `.uptimes`.
         Returns nan if no failures were observed.
         """
         total_failures = self.failure_counts.sum()
@@ -71,9 +80,10 @@ class SimulationResult:
     def mttr(self):
         """Mean time to repair: total repair time / total completed repairs (renewal estimator).
 
-        Same rationale as `mttf`. The numerator includes time spent in a repair
-        still in progress at mission end. Raw completed repair durations remain
-        available in `.downtimes`.
+        Same rationale and finite-window caveat as `mttf` (negligible in
+        practice while MTTR << mission time). The numerator includes time
+        spent in a repair still in progress at mission end. Raw completed
+        repair durations remain available in `.downtimes`.
 
         Returns nan if no repairs were completed.
         """
@@ -182,9 +192,10 @@ class FleetSimulationResult:
     def mttf(self):
         """Mean time to failure: total device operating time / total failures.
 
-        Renewal estimator over the whole fleet (see SimulationResult.mttf for
-        why naive interval averaging is length-biased). Returns nan if no
-        failures were observed.
+        Renewal estimator over the whole fleet — see SimulationResult.mttf for
+        why naive interval averaging is length-biased, and for the finite-window
+        caveat with non-exponential lifetimes. Returns nan if no failures were
+        observed.
         """
         total_failures = self.failure_counts.sum()
         if total_failures == 0:
@@ -197,8 +208,9 @@ class FleetSimulationResult:
 
         Uses total team-busy time (active repair only) over completed repairs.
         Note this excludes queue waiting time: a device's downtime is
-        wait + repair, so sum(device_downtime)/failures >= mttr whenever
-        repairs queue. Returns nan if no repairs were completed.
+        wait + repair, so mean downtime per failure typically exceeds mttr
+        when repairs queue (end-of-mission censoring can perturb the exact
+        comparison). Returns nan if no repairs were completed.
         """
         total_repairs = self.repair_counts.sum()
         if total_repairs == 0:

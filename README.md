@@ -58,14 +58,20 @@ print(result)
 
 Pass `seed=` to `simulate()` to make a run bit-for-bit reproducible (in the
 same environment). Each sampler — and each device in a fleet — draws from its
-own independent PCG64 stream spawned from the seed, so a device's trajectory
-does not depend on fleet size or event interleaving:
+own independent PCG64 stream spawned from the seed, so the random sequence a
+device consumes never depends on fleet size (full trajectories are also
+identical across fleet sizes when there is no repair queueing, i.e.
+`n_teams >= n_devices`):
 
 ```python
 r1 = device.simulate(reps=10000, seed=42)
 r2 = device.simulate(reps=10000, seed=42)
 # r1 and r2 are identical, sample by sample
 ```
+
+Custom distribution factories work too: a plain callable is accepted but sits
+outside seed control; implement `set_rng(generator)` (or subclass
+`farofa.distributions.Sampler`) to participate in seeding.
 
 ## Available distributions
 

@@ -1,8 +1,8 @@
 import numpy as np
 
-from .distributions import DISTRIBUTIONS
+from .distributions import DISTRIBUTIONS, Sampler
 from .results import SimulationResult
-from .utils import draw_positive
+from .utils import draw_positive, spawn_seed_sequence
 
 
 class SimpleDevice:
@@ -29,12 +29,19 @@ class SimpleDevice:
         Set the failure time distribution.
 
         Parameters:
-            dist: distribution name (str) or a callable that returns a
-                  random variate generator. Built-in names: 'exponential',
-                  'weibull', 'weibull_min', 'weibull_grp', 'weibull_grp2',
-                  'lognormal', 'normal', 'gamma'.
+            dist: distribution name (str) or a callable *factory* that
+                  returns a new sampler per call. Built-in names:
+                  'exponential', 'weibull', 'weibull_min', 'weibull_grp',
+                  'weibull_grp2', 'lognormal', 'normal', 'gamma'.
             *args, **kwargs: parameters passed to the distribution factory.
         """
+        if isinstance(dist, Sampler):
+            raise TypeError(
+                'pass the distribution factory and its parameters, e.g. '
+                "set_failure_dist('exponential', 0.01) or "
+                'set_failure_dist(farofa.exponential, 0.01) — not an '
+                'already-constructed sampler instance.'
+            )
         if callable(dist):
             self.failure_dist = dist(*args, **kwargs)
         elif isinstance(dist, str):
@@ -52,10 +59,18 @@ class SimpleDevice:
         Set the repair time distribution.
 
         Parameters:
-            dist: distribution name (str) or a callable that returns a
-                  random variate generator. Same options as set_failure_dist.
+            dist: distribution name (str) or a callable *factory* that
+                  returns a new sampler per call. Same options as
+                  set_failure_dist.
             *args, **kwargs: parameters passed to the distribution factory.
         """
+        if isinstance(dist, Sampler):
+            raise TypeError(
+                'pass the distribution factory and its parameters, e.g. '
+                "set_repair_dist('exponential', 0.1) or "
+                'set_repair_dist(farofa.exponential, 0.1) — not an '
+                'already-constructed sampler instance.'
+            )
         if callable(dist):
             self.repair_dist = dist(*args, **kwargs)
         elif isinstance(dist, str):
@@ -113,8 +128,7 @@ class SimpleDevice:
         if self.mission_time is None:
             raise ValueError('Mission time not set. Call set_mission_time() first.')
 
-        ss = seed if isinstance(seed, np.random.SeedSequence) else np.random.SeedSequence(seed)
-        failure_ss, repair_ss = ss.spawn(2)
+        failure_ss, repair_ss = spawn_seed_sequence(seed, 2)
         if hasattr(self.failure_dist, 'set_rng'):
             self.failure_dist.set_rng(np.random.Generator(np.random.PCG64(failure_ss)))
         if hasattr(self.repair_dist, 'set_rng'):

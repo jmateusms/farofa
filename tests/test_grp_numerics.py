@@ -57,6 +57,35 @@ class TestGRPPositivity:
         assert np.all(x > 0)
         assert np.all(np.isfinite(x))
 
+    def test_deep_underflow_recovers_representable_result(self):
+        # w underflows below the subnormal range, but v is huge enough that
+        # x ~= v*w/b ~ 1.23e-196 is perfectly representable. A naive
+        # exp(log_w) evaluation flushes to zero and clamps to _TINY instead.
+        v, b = math.exp(300), 3.0
+        a = math.exp(300 - 750 / 3)
+        x = _grp_inverse(v, a, b, math.exp(-1))
+        assert x == pytest.approx(math.exp(-450) / 3.0, rel=1e-10)
+
+    def test_virtual_age_ratio_underflow_no_crash(self):
+        # v/a underflows to 0.0 for subnormal v with large a; log(v) - log(a)
+        # must be used instead of log(v/a) or this raises a math domain error.
+        x = _grp_inverse(5e-324, 1e10, 2.0, 0.5)
+        assert x > 0
+        assert math.isfinite(x)
+
+    def test_branch_boundary_continuity(self):
+        # The log_w > 30 asymptotic branch must agree with the exact middle
+        # branch at the threshold. In this regime (v << a) the textbook direct
+        # form is stable and serves as the reference.
+        v, a, b = 1e-4, 100.0, 2.0
+        offset = b * (math.log(v) - math.log(a))
+        for target_log_w in (29.9, 30.1):
+            neg_log_u = math.exp(target_log_w + offset)
+            u = math.exp(-neg_log_u)
+            x = _grp_inverse(v, a, b, u)
+            reference = a * ((v / a) ** b + neg_log_u) ** (1.0 / b) - v
+            assert x == pytest.approx(reference, rel=1e-9)
+
 
 class TestGRPDistributionalCorrectness:
     def test_conditional_survival_at_median(self):
@@ -80,6 +109,7 @@ class TestGRPDistributionalCorrectness:
     def test_grp_sampler_end_to_end_still_degrades(self):
         # Sanity: the fixed formula preserves the aging behaviour (b>1, q>0).
         gen = weibull_grp(100.0, 2.0, 0.8)
+        gen.set_rng(np.random.default_rng(20260804))
         samples = [gen() for _ in range(5000)]
         assert np.mean(samples[:500]) > np.mean(samples[-500:])
 
@@ -87,11 +117,13 @@ class TestGRPDistributionalCorrectness:
 class TestTruncatedNormal:
     def test_all_draws_positive(self):
         gen = normal(1.0, 2.0)  # substantial negative mass before truncation
+        gen.set_rng(np.random.default_rng(20260804))
         x = np.array([gen() for _ in range(10_000)])
         assert np.all(x > 0)
 
     def test_mean_preserved_when_truncation_negligible(self):
         gen = normal(100.0, 10.0)
+        gen.set_rng(np.random.default_rng(20260804))
         x = np.array([gen() for _ in range(10_000)])
         assert np.mean(x) == pytest.approx(100.0, rel=0.05)
 

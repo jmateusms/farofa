@@ -48,7 +48,8 @@ class Sampler:
 
     def set_rng(self, rng):
         """Attach a numpy Generator; discards buffered draws so subsequent
-        output is fully determined by ``rng``."""
+        output is fully determined by ``rng``. Call ``reset()`` separately to
+        also clear sampler state (e.g. GRP virtual age)."""
         self._rng = rng
         self._buf = None
         self._i = 0
@@ -106,14 +107,20 @@ def _grp_inverse(v, a, b, u):
     if v <= 0.0:
         x = a * neg_log_u ** (1.0 / b)
     else:
-        log_w = math.log(neg_log_u) - b * math.log(v / a)
+        # log(v) - log(a), not log(v/a): the ratio itself can over/underflow
+        # for extreme v/a even though both logs are finite.
+        log_w = math.log(neg_log_u) - b * (math.log(v) - math.log(a))
         if log_w > 30.0:
-            # w >= ~1e13: v is negligible against the fresh draw; the direct
-            # form has no cancellation here (ratio to v is at least e^(30/b)).
-            x = a * neg_log_u ** (1.0 / b) - v
-        elif log_w < -30.0:
-            # w <= ~1e-13: expm1(log1p(w)/b) == w/b to double precision.
-            x = v * math.exp(log_w) / b
+            # w >= ~1e13 (v tiny vs the fresh draw): restore the (v/a)^b term
+            # as neg_log_u * e^(-log_w) so this branch is the exact identity;
+            # no cancellation, since x >= (e^(30/b) - 1) * v.
+            x = a * (neg_log_u + math.exp(math.log(neg_log_u) - log_w)) ** (1.0 / b) - v
+        elif log_w < -700.0:
+            # w at/below the subnormal range, where exp(log_w) on its own
+            # loses precision or flushes to zero: x ~= v*w/b, assembled in log
+            # space so a huge v still compensates a tiny w. The dropped
+            # correction terms are O(w) < 1e-304 relative.
+            x = math.exp(math.log(v) + log_w - math.log(b))
         else:
             x = v * math.expm1(math.log1p(math.exp(log_w)) / b)
     # Clamp genuine underflow (astronomical virtual age) to the smallest
@@ -295,7 +302,9 @@ def normal(mu, sigma):
     Negative variates would run simulated time backwards, so draws are
     rejected until positive (i.e., this samples the normal distribution
     conditioned on X > 0). The truncation is negligible when mu >> sigma;
-    the factory refuses parameters whose positive mass is vanishingly small.
+    the factory refuses parameters with P(X > 0) below 0.1% — beyond that the
+    distribution is essentially a half-normal tail and rejection sampling
+    would draw thousands of variates per accepted sample.
 
     Parameters:
         mu: mean (of the untruncated distribution)
@@ -305,10 +314,8 @@ def normal(mu, sigma):
         A callable that generates positive, normally distributed random values.
     """
     _require_positive(sigma=sigma)
-    # P(X > 0) for the untruncated normal; refuse practically-degenerate cases
-    # where rejection sampling would loop (nearly) forever.
     p_positive = 0.5 * math.erfc(-mu / (sigma * math.sqrt(2.0)))
-    if p_positive < 1e-6:
+    if p_positive < 1e-3:
         raise ValueError(
             f'normal(mu={mu}, sigma={sigma}) has practically no positive mass '
             f'(P(X>0)={p_positive:.2e}); failure/repair times must be positive.'

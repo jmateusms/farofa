@@ -39,6 +39,18 @@ class TestMTTFRenewalEstimator:
         result = device.simulate(reps=2000, seed=102)
         assert result.mttr == pytest.approx(100.0, rel=0.08)
 
+    def test_mttf_weibull_long_window(self):
+        # Non-exponential law: the renewal estimator's finite-window bias is
+        # O(MTTF/T), so with T = 100*MTTF it must sit close to the true value.
+        import math
+        a = 1000.0 / math.gamma(1.0 + 1.0 / 3.0)  # Weibull b=3, true MTTF = 1000
+        device = SimpleDevice()
+        device.set_failure_dist('weibull', a, 3.0)
+        device.set_repair_dist('exponential', 0.02)
+        device.set_mission_time(100000)
+        result = device.simulate(reps=1000, seed=105)
+        assert result.mttf == pytest.approx(1000.0, rel=0.03)
+
     def test_availability_matches_steady_state(self):
         # lambda=1e-3, mu=1e-2: A ~= mu/(lambda+mu) = 0.9091 (T >> transient)
         device = SimpleDevice()

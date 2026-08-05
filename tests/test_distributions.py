@@ -58,6 +58,7 @@ class TestWeibullMin:
         # For b>1 (degrading Weibull), a single sampler's inter-failure times
         # should shrink as virtual age accumulates. Compare first vs last block.
         gen = weibull_min(100.0, 2.0)
+        gen.set_rng(np.random.default_rng(20260804))
         n = 5000
         samples = [gen() for _ in range(n)]
         block = n // 10
@@ -65,6 +66,7 @@ class TestWeibullMin:
 
     def test_reset_restarts_virtual_age(self):
         gen = weibull_min(100.0, 2.0)
+        gen.set_rng(np.random.default_rng(20260804))
         # Burn in to advance virtual age significantly
         for _ in range(500):
             gen()
@@ -99,6 +101,7 @@ class TestWeibullGRP:
     def test_degrading_for_partial_q(self):
         # 0<q<1: virtual age grows, inter-failure times should decrease over time
         gen = weibull_grp(100.0, 2.0, 0.8)
+        gen.set_rng(np.random.default_rng(20260804))
         n = 5000
         samples = [gen() for _ in range(n)]
         block = n // 10
@@ -142,6 +145,8 @@ class TestGRPTypeIDiffersFromTypeII:
         n = 200
         gen1 = weibull_grp(a, b, q)
         gen2 = weibull_grp2(a, b, q)
+        gen1.set_rng(np.random.default_rng(20260804))
+        gen2.set_rng(np.random.default_rng(20260805))
         for _ in range(n):
             gen1()
             gen2()

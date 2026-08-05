@@ -68,6 +68,17 @@ class TestSimpleDeviceCustomDist:
         device.set_repair_dist(lognormal, 1.0, 0.5)
         assert device.repair_dist is not None
 
+    def test_prebuilt_sampler_instance_rejected(self):
+        # Passing exponential(0.01) instead of (exponential, 0.01) would be
+        # silently treated as a factory and stored as a float — reject early.
+        from farofa.distributions import exponential
+
+        device = SimpleDevice()
+        with pytest.raises(TypeError, match='factory'):
+            device.set_failure_dist(exponential(0.01))
+        with pytest.raises(TypeError, match='factory'):
+            device.set_repair_dist(exponential(0.1))
+
 
 class TestSimpleDeviceSimulate:
     def _make_device(self, mission_time=8760):
