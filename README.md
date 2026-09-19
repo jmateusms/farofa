@@ -73,6 +73,38 @@ Custom distribution factories work too: a plain callable is accepted but sits
 outside seed control; implement `set_rng(generator)` (or subclass
 `farofa.distributions.Sampler`) to participate in seeding.
 
+### Uncertainty from replications
+
+Availability results expose a normal-approximation confidence interval based
+on one outcome per replication:
+
+```python
+result.availability_confidence_interval()  # (lower, upper), 95% by default
+result.failure_count_confidence_interval() # mean total failures per replication
+```
+
+For a fleet, the outcome is the whole fleet's device-hour availability in a
+replication, rather than one value per device: shared maintenance teams induce
+within-replication dependence. The interval describes Monte Carlo sampling
+error only. It does not remove the established `[0, T)` mission-boundary
+censoring or model uncertainty; with fewer than two replications it returns
+`(nan, nan)`. Fleets also expose `server_utilization_confidence_interval()`;
+it uses `busy_team_hours / (n_teams * mission_time)` once per replication.
+
+### Reproducible result export and illustrative sizing
+
+Both result types provide `to_dict()` and `export_json(path)`. The export is a
+versioned JSON payload with summary metrics, confidence intervals and the raw
+outcome for every replication. Unavailable numerical estimates are exported as
+JSON `null` (while the Python API retains `nan`). In fleet outputs, those whole-fleet replication
+outcomes are the unit for intervals; per-device rows are diagnostic only.
+
+`examples/illustrative_team_sizing.py` is a runnable synthetic comparison of
+one, two and three maintenance teams. It records its seed, replication budget,
+finite-horizon convention and all assumptions in
+`illustrative_team_sizing_results.json`. Its values are deliberately invented
+for a reproducible example and are **not** a real staffing recommendation.
+
 ## Available distributions
 
 | Distribution | Function | Repair assumption | Parameters |
@@ -89,6 +121,7 @@ outside seed control; implement `set_rng(generator)` (or subclass
 ## Roadmap
 
 farofa is being developed incrementally. Below is the planned scope for each milestone.
+The versioned current-state plan is [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
 
 ### v0 — Single device simulation
 
@@ -103,7 +136,7 @@ Core simulation engine for a single repairable device.
 - [x] Results object with summary statistics and raw simulation data
 - [x] Input validation and meaningful error messages
 - [x] Unit tests
-- [ ] CI
+- [x] CI: pytest on supported Python versions
 
 ### v1 — Queueing systems (current)
 

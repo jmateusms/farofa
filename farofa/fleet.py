@@ -5,7 +5,7 @@ import numpy as np
 
 from .distributions import DISTRIBUTIONS, Sampler
 from .results import FleetSimulationResult
-from .utils import draw_positive, spawn_seed_sequence
+from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps
 
 _FAILURE = 0
 _REPAIR_DONE = 1
@@ -80,14 +80,7 @@ class Fleet:
 
     def set_mission_time(self, mission_time):
         """Set the mission time (total simulation duration per replication)."""
-        if not isinstance(mission_time, (int, float)):
-            try:
-                mission_time = float(mission_time)
-            except (TypeError, ValueError) as e:
-                raise TypeError('Mission time must be a number.') from e
-        if mission_time <= 0:
-            raise ValueError('Mission time must be greater than 0.')
-        self.mission_time = float(mission_time)
+        self.mission_time = validate_mission_time(mission_time)
 
     def _instantiate_samplers(self, spec, n):
         # One sampler instance per device: virtual ages stay independent and
@@ -114,13 +107,7 @@ class Fleet:
         Returns:
             FleetSimulationResult with per-device and fleet-level metrics.
         """
-        if not isinstance(reps, int):
-            try:
-                reps = int(reps)
-            except (TypeError, ValueError):
-                raise ValueError('reps must be an integer or convertible to integer.')
-        if reps <= 0:
-            raise ValueError('reps must be greater than 0.')
+        reps = validate_reps(reps)
         if self._failure_spec is None:
             raise ValueError('Failure distribution not set. Call set_failure_dist() first.')
         if self._repair_spec is None:

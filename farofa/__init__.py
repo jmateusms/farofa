@@ -4,4 +4,4 @@ from .distributions import (
 )
 from .device import SimpleDevice
 from .fleet import Fleet
-from .results import SimulationResult, FleetSimulationResult
+from .results import SimulationResult, FleetSimulationResult, mean_confidence_interval

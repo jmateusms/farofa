@@ -1,4 +1,87 @@
+import json
+from pathlib import Path
+from statistics import NormalDist
+
 import numpy as np
+
+
+def mean_confidence_interval(values, confidence=0.95, *, lower=None, upper=None):
+    """Normal-approximation confidence interval for a replication mean.
+
+    ``values`` must contain one scalar outcome from each independent Monte
+    Carlo replication.  It deliberately does not accept device-level values
+    from a fleet: devices can share a repair queue and are therefore not
+    independent observations.  With fewer than two replications the sampling
+    variance is unavailable and both endpoints are ``nan``.
+
+    The interval is ``mean ± z * s / sqrt(R)``, where ``s`` is the sample
+    standard deviation (``ddof=1``).  It quantifies Monte Carlo sampling
+    error only; it does not correct finite-horizon censoring or model error.
+    Optional bounds clip endpoints for bounded estimands such as availability.
+    """
+    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+        raise TypeError('confidence must be a finite number between 0 and 1.')
+    confidence = float(confidence)
+    if not np.isfinite(confidence) or not 0.0 < confidence < 1.0:
+        raise ValueError('confidence must be a finite number between 0 and 1.')
+
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 1:
+        raise ValueError('values must be a one-dimensional array of replication outcomes.')
+    if not np.all(np.isfinite(values)):
+        raise ValueError('values must be finite.')
+
+    def validate_bound(name, value):
+        if value is None:
+            return None
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise TypeError(f'{name} must be a finite number or None.')
+        value = float(value)
+        if not np.isfinite(value):
+            raise ValueError(f'{name} must be a finite number or None.')
+        return value
+
+    lower = validate_bound('lower', lower)
+    upper = validate_bound('upper', upper)
+    if lower is not None and upper is not None and lower > upper:
+        raise ValueError('lower must not exceed upper.')
+    if values.size < 2:
+        return (np.nan, np.nan)
+
+    mean = float(values.mean())
+    # For a representable confidence just below 1, 0.5 + c/2 can round to
+    # exactly 1. Clamp to the largest representable probability below it.
+    probability = min(0.5 + confidence / 2.0, np.nextafter(1.0, 0.0))
+    z = NormalDist().inv_cdf(probability)
+    half_width = z * float(values.std(ddof=1)) / np.sqrt(values.size)
+    lo, hi = mean - half_width, mean + half_width
+    if lower is not None:
+        lo = max(lower, lo)
+    if upper is not None:
+        hi = min(upper, hi)
+    return (float(lo), float(hi))
+
+
+def _json_safe(value):
+    """Return JSON values, representing unavailable numeric estimates as null."""
+    if isinstance(value, np.ndarray):
+        return _json_safe(value.tolist())
+    if isinstance(value, np.generic):
+        return _json_safe(value.item())
+    if isinstance(value, float):
+        return value if np.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def _export_json(payload, path):
+    """Write a portable result payload and return the destination path."""
+    destination = Path(path)
+    destination.write_text(json.dumps(payload, indent=2, allow_nan=False) + '\n', encoding='utf-8')
+    return destination
 
 
 class SimulationResult:
@@ -37,6 +120,33 @@ class SimulationResult:
         """Availability for each replication."""
         return self.total_uptime / self.mission_time
 
+    def availability_confidence_interval(self, confidence=0.95):
+        """Confidence interval for finite-horizon availability across reps.
+
+        The observation is each replication's ``uptime / mission_time``. The
+        normal approximation describes Monte Carlo error, while failure or
+        repair intervals crossing the mission boundary remain right-censored
+        by the model's established ``[0, T)`` convention.
+        """
+        return mean_confidence_interval(
+            self.availability_per_rep, confidence, lower=0.0, upper=1.0
+        )
+
+    @property
+    def total_failures_per_rep(self):
+        """Total failures in each replication (one device equals the total)."""
+        return self.failure_counts.astype(float)
+
+    def failure_count_confidence_interval(self, confidence=0.95):
+        """Confidence interval for mean total failures per replication.
+
+        The normal approximation describes Monte Carlo error of the finite
+        mission count. It does not extrapolate failures censored at ``T``.
+        """
+        return mean_confidence_interval(
+            self.total_failures_per_rep, confidence, lower=0.0
+        )
+
     @property
     def mean_failures(self):
         """Mean number of failures across replications."""
@@ -53,20 +163,16 @@ class SimulationResult:
     def mttf(self):
         """Mean time to failure: total operating time / total failures (renewal estimator).
 
-        Averaging only the completed inter-failure intervals would be length-biased
-        in a fixed mission window (inspection paradox): intervals still running at
-        mission end are censored, and long intervals are censored more often, so the
-        naive mean underestimates badly (~3x low when true MTTF ~ mission time).
-        The renewal estimator sum(total_uptime) / sum(failure_counts) has no such
-        bias, but its remaining accuracy depends on the failure law:
+        Completed intervals alone omit mission-end censoring and can underrepresent
+        long intervals. This exposure/count ratio includes censored operating time,
+        but is not generally unbiased in finite samples: a ratio of expectations
+        is not the expectation of a ratio, even with exponential failures.
 
-        - exponential failures: unbiased at any mission time (constant hazard
-          makes E[failures] = lambda * E[uptime] an identity);
-        - non-exponential failures: the censored final interval leaves a window
-          bias of order MTTF/T that vanishes as T grows — e.g. for Weibull
-          shape 3, roughly +86% at T = MTTF, +16% at T = 3*MTTF, +2% at
-          T = 20*MTTF. Use a mission time well beyond the mean lifetime when
-          estimating a non-exponential MTTF.
+        For a regenerative renewal model with iid lifetimes and perfect repairs,
+        the ratio converges to the lifetime mean over a sufficiently long horizon.
+        Finite-window error depends on the failure law, horizon and number of
+        replications. With imperfect repair or nonstationary hazards, interpret it
+        as observed exposure per failure, not a distributional mean lifetime.
 
         Raw completed intervals remain available in `.uptimes`.
         Returns nan if no failures were observed.
@@ -110,6 +216,36 @@ class SimulationResult:
             'availability': self.availability,
             'failure_rate': self.failure_rate,
         }
+
+    def to_dict(self, confidence=0.95):
+        """Return a JSON-serializable finite-horizon result export.
+
+        Per-replication values are retained so a consumer can recompute the
+        documented normal-approximation intervals. Unavailable estimates (for
+        example an interval with fewer than two replications) are ``null`` in
+        this export; the numerical API continues to return ``numpy.nan``.
+        """
+        return _json_safe({
+            'schema_version': 1,
+            'result_kind': 'simple_device',
+            'summary': self.summary(),
+            'confidence': confidence,
+            'confidence_intervals': {
+                'availability': list(self.availability_confidence_interval(confidence)),
+                'failure_count': list(self.failure_count_confidence_interval(confidence)),
+            },
+            'replications': {
+                'availability': self.availability_per_rep.tolist(),
+                'failure_counts': self.failure_counts.tolist(),
+                'repair_counts': self.repair_counts.tolist(),
+                'total_uptime': self.total_uptime.tolist(),
+                'total_downtime': self.total_downtime.tolist(),
+            },
+        })
+
+    def export_json(self, path, confidence=0.95):
+        """Write :meth:`to_dict` as UTF-8 JSON and return its ``Path``."""
+        return _export_json(self.to_dict(confidence), path)
 
     def __repr__(self):
         s = self.summary()
@@ -168,6 +304,35 @@ class FleetSimulationResult:
         """Fleet availability for each replication."""
         return self.device_uptime.sum(axis=1) / (self.n_devices * self.mission_time)
 
+    def availability_confidence_interval(self, confidence=0.95):
+        """Confidence interval for fleet availability across replications.
+
+        One replication-wide device-hour fraction is one observation. Devices
+        within a replication are correlated whenever they share maintenance
+        teams, so treating them as independent would understate uncertainty.
+        The interval quantifies Monte Carlo error only; events unfinished at
+        the mission boundary are censored under the existing ``[0, T)`` rule.
+        """
+        return mean_confidence_interval(
+            self.availability_per_rep, confidence, lower=0.0, upper=1.0
+        )
+
+    @property
+    def total_failures_per_rep(self):
+        """Total fleet failures in each replication, across all devices."""
+        return self.failure_counts.sum(axis=1).astype(float)
+
+    def failure_count_confidence_interval(self, confidence=0.95):
+        """Confidence interval for mean total fleet failures per replication.
+
+        One whole-fleet count is an observation; device counts in a shared
+        queue are not independent. Counts at the finite mission boundary are
+        subject to the established ``[0, T)`` censoring convention.
+        """
+        return mean_confidence_interval(
+            self.total_failures_per_rep, confidence, lower=0.0
+        )
+
     @property
     def per_device_availability(self):
         """Mean availability per device, averaged across replications. Shape (n_devices,)."""
@@ -177,6 +342,21 @@ class FleetSimulationResult:
     def server_utilization(self):
         """Mean fraction of team-hours spent repairing (busy time / available team time)."""
         return float(np.mean(self.busy_team_hours / (self.n_teams * self.mission_time)))
+
+    @property
+    def server_utilization_per_rep(self):
+        """Busy team-hours divided by available team-hours in each replication."""
+        return self.busy_team_hours / (self.n_teams * self.mission_time)
+
+    def server_utilization_confidence_interval(self, confidence=0.95):
+        """Confidence interval for mean finite-horizon team utilization.
+
+        A replication-wide busy-hours fraction is the observation. Ongoing
+        repairs contribute only their busy time up to mission end.
+        """
+        return mean_confidence_interval(
+            self.server_utilization_per_rep, confidence, lower=0.0, upper=1.0
+        )
 
     @property
     def mean_failures(self):
@@ -246,6 +426,40 @@ class FleetSimulationResult:
             'mean_wait_time': self.mean_wait_time,
             'max_queue_observed': self.max_queue_observed,
         }
+
+    def to_dict(self, confidence=0.95):
+        """Return a JSON-serializable finite-horizon fleet result export.
+
+        Per-replication fleet metrics are the statistical observations. Device
+        rows are also exported for diagnosis, but must not be treated as
+        independent observations when teams are shared.
+        """
+        return _json_safe({
+            'schema_version': 1,
+            'result_kind': 'fleet',
+            'summary': self.summary(),
+            'confidence': confidence,
+            'confidence_intervals': {
+                'availability': list(self.availability_confidence_interval(confidence)),
+                'failure_count': list(self.failure_count_confidence_interval(confidence)),
+                'server_utilization': list(self.server_utilization_confidence_interval(confidence)),
+            },
+            'replications': {
+                'availability': self.availability_per_rep.tolist(),
+                'failure_counts': self.failure_counts.tolist(),
+                'repair_counts': self.repair_counts.tolist(),
+                'device_uptime': self.device_uptime.tolist(),
+                'device_downtime': self.device_downtime.tolist(),
+                'busy_team_hours': self.busy_team_hours.tolist(),
+                'server_utilization': self.server_utilization_per_rep.tolist(),
+                'max_queue': self.max_queue.tolist(),
+                'wait_times': [wait.tolist() for wait in self.wait_times],
+            },
+        })
+
+    def export_json(self, path, confidence=0.95):
+        """Write :meth:`to_dict` as UTF-8 JSON and return its ``Path``."""
+        return _export_json(self.to_dict(confidence), path)
 
     def __repr__(self):
         s = self.summary()

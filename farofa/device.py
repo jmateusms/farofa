@@ -2,7 +2,7 @@ import numpy as np
 
 from .distributions import DISTRIBUTIONS, Sampler
 from .results import SimulationResult
-from .utils import draw_positive, spawn_seed_sequence
+from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps
 
 
 class SimpleDevice:
@@ -85,14 +85,7 @@ class SimpleDevice:
 
     def set_mission_time(self, mission_time):
         """Set the mission time (total simulation duration per replication)."""
-        if not isinstance(mission_time, (int, float)):
-            try:
-                mission_time = float(mission_time)
-            except (TypeError, ValueError) as e:
-                raise TypeError('Mission time must be a number.') from e
-        if mission_time <= 0:
-            raise ValueError('Mission time must be greater than 0.')
-        self.mission_time = float(mission_time)
+        self.mission_time = validate_mission_time(mission_time)
 
     def generate_failure(self):
         return draw_positive(self.failure_dist, 'failure')
@@ -114,13 +107,7 @@ class SimpleDevice:
         Returns:
             SimulationResult with detailed metrics.
         """
-        if not isinstance(reps, int):
-            try:
-                reps = int(reps)
-            except (TypeError, ValueError):
-                raise ValueError('reps must be an integer or convertible to integer.')
-        if reps <= 0:
-            raise ValueError('reps must be greater than 0.')
+        reps = validate_reps(reps)
         if self.failure_dist is None:
             raise ValueError('Failure distribution not set. Call set_failure_dist() first.')
         if self.repair_dist is None:

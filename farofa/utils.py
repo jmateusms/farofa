@@ -24,6 +24,43 @@ def spawn_seed_sequence(seed, n_children):
     return ss.spawn(n_children)
 
 
+def validate_mission_time(mission_time):
+    """Return a finite, strictly positive mission duration as ``float``."""
+    if isinstance(mission_time, (bool, np.bool_)):
+        raise TypeError('Mission time must be a number.')
+    try:
+        mission_time = float(mission_time)
+    except (TypeError, ValueError, OverflowError) as e:
+        raise TypeError('Mission time must be a number.') from e
+    if not math.isfinite(mission_time) or mission_time <= 0.0:
+        raise ValueError('Mission time must be finite and greater than 0.')
+    return mission_time
+
+
+def validate_reps(reps):
+    """Return a strictly positive whole number of Monte Carlo replications.
+
+    Exact integral values such as ``2.0`` and ``"2"`` remain accepted for
+    backwards compatibility. Fractional, non-finite, and boolean inputs are
+    rejected instead of silently truncating a requested simulation.
+    """
+    if isinstance(reps, (bool, np.bool_)):
+        raise ValueError('reps must be a positive integer.')
+    if isinstance(reps, (int, np.integer)):
+        value = int(reps)
+    else:
+        try:
+            numeric = float(reps)
+        except (TypeError, ValueError, OverflowError) as e:
+            raise ValueError('reps must be a positive integer.') from e
+        if not math.isfinite(numeric) or not numeric.is_integer():
+            raise ValueError('reps must be a positive integer.')
+        value = int(numeric)
+    if value <= 0:
+        raise ValueError('reps must be a positive integer.')
+    return value
+
+
 def draw_positive(sampler, role):
     """Draw one variate and enforce strictly positive, finite support.
 
