@@ -137,6 +137,22 @@ enter these likelihoods.
 diesel-engine records (USS Halfbeak, which deteriorates, and USS Grampus,
 which shows no trend).
 
+### Event trace and timelines
+
+`simulate(..., trace=k)` records the events of the first `k` replications — `FAILURE`,
+`REPAIR_START` (a team takes the device, possibly after queueing) and `REPAIR_DONE` — in
+`result.event_log`, a structured array with columns `rep, entity, event, time`. Recording
+draws no random numbers, so every metric is identical with or without it.
+
+```python
+result = fleet.simulate(reps=1000, seed=42, trace=3)
+result.event_log[:5]            # (rep, device, event, time) rows
+tl = result.timeline(0)         # (entity, state, start, end); state: up / waiting / repair
+```
+
+Counting `waiting` and `repair` intervals over time gives the queue length and the busy
+teams; `to_dict()` / `export_json()` include the event log when a trace was recorded.
+
 ## Available distributions
 
 | Distribution | Function | Repair assumption | Parameters |

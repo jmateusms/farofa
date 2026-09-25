@@ -61,6 +61,29 @@ def validate_reps(reps):
     return value
 
 
+def validate_trace(trace):
+    """Return how many leading replications to record in the event log.
+
+    ``0`` (the default) records nothing. Values larger than ``reps`` simply
+    record every replication. Same integer rules as :func:`validate_reps`.
+    """
+    if isinstance(trace, (bool, np.bool_)):
+        raise ValueError('trace must be a non-negative integer.')
+    if isinstance(trace, (int, np.integer)):
+        value = int(trace)
+    else:
+        try:
+            numeric = float(trace)
+        except (TypeError, ValueError, OverflowError) as e:
+            raise ValueError('trace must be a non-negative integer.') from e
+        if not math.isfinite(numeric) or not numeric.is_integer():
+            raise ValueError('trace must be a non-negative integer.')
+        value = int(numeric)
+    if value < 0:
+        raise ValueError('trace must be a non-negative integer.')
+    return value
+
+
 def draw_positive(sampler, role):
     """Draw one variate and enforce strictly positive, finite support.
 
