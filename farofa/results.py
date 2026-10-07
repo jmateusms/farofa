@@ -84,6 +84,50 @@ def _export_json(payload, path):
     return destination
 
 
+#: Columns of the flat event log recorded by ``simulate(..., trace=k)``.
+EVENT_DTYPE = np.dtype([('rep', np.int64), ('entity', np.int64), ('event', 'U12'), ('time', np.float64)])
+#: State of an entity after each event type (``up`` before the first event).
+_STATE_AFTER = {'FAILURE': 'waiting', 'REPAIR_START': 'repair', 'REPAIR_DONE': 'up'}
+TIMELINE_DTYPE = np.dtype([('entity', np.int64), ('state', 'U7'), ('start', np.float64), ('end', np.float64)])
+
+
+def _event_array(rows):
+    """Build the structured event log from ``(rep, entity, event, time)`` rows."""
+    return np.array(rows, dtype=EVENT_DTYPE)
+
+
+def _timeline(event_log, traced_reps, rep, n_entities, mission_time):
+    """State intervals ``(entity, state, start, end)`` of one traced replication.
+
+    States are ``up``, ``waiting`` (failed, no team free) and ``repair``;
+    zero-length intervals are omitted and the last one is closed at the
+    mission time. Intervals of each entity cover ``[0, mission_time]``.
+    """
+    if event_log is None or not 0 <= rep < traced_reps:
+        raise ValueError(f'Replication {rep} was not traced; use simulate(..., trace=k) with k > {rep}.')
+    rows = event_log[event_log['rep'] == rep]
+    intervals = []
+    for entity in range(n_entities):
+        state, since = 'up', 0.0
+        for row in rows[rows['entity'] == entity]:
+            t = float(row['time'])
+            if t > since:
+                intervals.append((entity, state, since, t))
+            state, since = _STATE_AFTER[str(row['event'])], t
+        if mission_time > since:
+            intervals.append((entity, state, since, float(mission_time)))
+    return np.array(intervals, dtype=TIMELINE_DTYPE)
+
+
+def _event_log_dict(event_log, traced_reps):
+    """JSON form of the event log: column names and one row per event."""
+    return {
+        'traced_reps': int(traced_reps),
+        'columns': list(EVENT_DTYPE.names),
+        'rows': [[int(r['rep']), int(r['entity']), str(r['event']), float(r['time'])] for r in event_log],
+    }
+
+
 class SimulationResult:
     """
     Stores and summarizes results from a failure-repair simulation.
@@ -97,10 +141,13 @@ class SimulationResult:
         downtimes: list of arrays, each containing downtimes (times to repair) per replication
         total_uptime: array of total uptime per replication
         total_downtime: array of total downtime per replication
+        event_log: structured array (rep, entity, event, time) of the traced
+            leading replications, or ``None`` when ``trace=0``
+        traced_reps: number of leading replications in ``event_log``
     """
 
     def __init__(self, mission_time, failure_counts, repair_counts,
-                 uptimes, downtimes, total_uptime, total_downtime):
+                 uptimes, downtimes, total_uptime, total_downtime, event_log=None, traced_reps=0):
         self.mission_time = mission_time
         self.reps = len(failure_counts)
         self.failure_counts = np.array(failure_counts)
@@ -109,6 +156,12 @@ class SimulationResult:
         self.downtimes = downtimes
         self.total_uptime = np.array(total_uptime)
         self.total_downtime = np.array(total_downtime)
+        self.event_log = event_log
+        self.traced_reps = traced_reps
+
+    def timeline(self, rep=0):
+        """State intervals of traced replication ``rep`` (see ``TIMELINE_DTYPE``)."""
+        return _timeline(self.event_log, self.traced_reps, rep, 1, self.mission_time)
 
     @property
     def availability(self):
@@ -241,6 +294,7 @@ class SimulationResult:
                 'total_uptime': self.total_uptime.tolist(),
                 'total_downtime': self.total_downtime.tolist(),
             },
+            **({'event_log': _event_log_dict(self.event_log, self.traced_reps)} if self.event_log is not None else {}),
         })
 
     def export_json(self, path, confidence=0.95):
@@ -276,12 +330,15 @@ class FleetSimulationResult:
         busy_team_hours: (reps,) array of total team-busy time per rep
         max_queue: (reps,) array of the largest queue length observed per rep
         wait_times: list of length reps; each entry is an array of per-repair wait times
+        event_log: structured array (rep, entity, event, time) of the traced
+            leading replications, or ``None`` when ``trace=0``
+        traced_reps: number of leading replications in ``event_log``
     """
 
     def __init__(self, mission_time, n_devices, n_teams,
                  failure_counts, repair_counts,
                  device_uptime, device_downtime,
-                 busy_team_hours, max_queue, wait_times):
+                 busy_team_hours, max_queue, wait_times, event_log=None, traced_reps=0):
         self.mission_time = mission_time
         self.n_devices = n_devices
         self.n_teams = n_teams
@@ -293,6 +350,17 @@ class FleetSimulationResult:
         self.busy_team_hours = np.asarray(busy_team_hours)
         self.max_queue = np.asarray(max_queue)
         self.wait_times = wait_times
+        self.event_log = event_log
+        self.traced_reps = traced_reps
+
+    def timeline(self, rep=0):
+        """State intervals of every device in traced replication ``rep``.
+
+        Returns a structured array (entity, state, start, end) with states
+        ``up``, ``waiting`` and ``repair``; counting ``waiting`` and ``repair``
+        intervals over time gives the queue length and the busy teams.
+        """
+        return _timeline(self.event_log, self.traced_reps, rep, self.n_devices, self.mission_time)
 
     @property
     def fleet_availability(self):
@@ -455,6 +523,7 @@ class FleetSimulationResult:
                 'max_queue': self.max_queue.tolist(),
                 'wait_times': [wait.tolist() for wait in self.wait_times],
             },
+            **({'event_log': _event_log_dict(self.event_log, self.traced_reps)} if self.event_log is not None else {}),
         })
 
     def export_json(self, path, confidence=0.95):

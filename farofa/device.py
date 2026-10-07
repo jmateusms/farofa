@@ -1,8 +1,8 @@
 import numpy as np
 
 from .distributions import DISTRIBUTIONS, Sampler
-from .results import SimulationResult
-from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps
+from .results import SimulationResult, _event_array
+from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps, validate_trace
 
 
 class SimpleDevice:
@@ -93,7 +93,7 @@ class SimpleDevice:
     def generate_repair(self):
         return draw_positive(self.repair_dist, 'repair')
 
-    def simulate(self, reps=1, seed=None):
+    def simulate(self, reps=1, seed=None, trace=0):
         """
         Run the failure-repair simulation.
 
@@ -103,11 +103,17 @@ class SimpleDevice:
                 bit-for-bit reproducible (same environment): the failure and
                 repair samplers each get an independent PCG64 stream spawned
                 from this seed. When None, fresh OS entropy is used.
+            trace: record the events (FAILURE, REPAIR_START, REPAIR_DONE) of
+                the first ``trace`` replications in ``result.event_log``; see
+                ``result.timeline(rep)``. Recording draws no random numbers, so
+                every result is identical with or without it.
 
         Returns:
             SimulationResult with detailed metrics.
         """
         reps = validate_reps(reps)
+        traced_reps = min(validate_trace(trace), reps)
+        events = []
         if self.failure_dist is None:
             raise ValueError('Failure distribution not set. Call set_failure_dist() first.')
         if self.repair_dist is None:
@@ -129,7 +135,8 @@ class SimpleDevice:
         total_uptime = []
         total_downtime = []
 
-        for _ in range(reps):
+        for r in range(reps):
+            rec = r < traced_reps
             if hasattr(self.failure_dist, 'reset'):
                 self.failure_dist.reset()
             if hasattr(self.repair_dist, 'reset'):
@@ -153,6 +160,9 @@ class SimpleDevice:
                         failures += 1
                         t += ttf
                         operational = False
+                        if rec:
+                            events.append((r, 0, 'FAILURE', t))
+                            events.append((r, 0, 'REPAIR_START', t))
                     else:
                         # Device survives until end of mission
                         rep_uptime += (T - t)
@@ -165,6 +175,8 @@ class SimpleDevice:
                         repairs += 1
                         t += ttr
                         operational = True
+                        if rec:
+                            events.append((r, 0, 'REPAIR_DONE', t))
                     else:
                         # Repair extends beyond mission time
                         rep_downtime += (T - t)
@@ -185,4 +197,6 @@ class SimpleDevice:
             downtimes=all_downtimes,
             total_uptime=total_uptime,
             total_downtime=total_downtime,
+            event_log=_event_array(events) if traced_reps else None,
+            traced_reps=traced_reps,
         )

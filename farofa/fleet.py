@@ -4,8 +4,8 @@ from collections import deque
 import numpy as np
 
 from .distributions import DISTRIBUTIONS, Sampler
-from .results import FleetSimulationResult
-from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps
+from .results import FleetSimulationResult, _event_array
+from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps, validate_trace
 
 _FAILURE = 0
 _REPAIR_DONE = 1
@@ -88,7 +88,7 @@ class Fleet:
         factory, args, kwargs = spec
         return [factory(*args, **kwargs) for _ in range(n)]
 
-    def simulate(self, reps=1, seed=None):
+    def simulate(self, reps=1, seed=None, trace=0):
         """
         Run the fleet failure-repair simulation.
 
@@ -103,11 +103,19 @@ class Fleet:
                 across fleet sizes only when no repair queueing occurs
                 (n_teams >= n_devices); with fewer teams than devices, queue
                 waits shift event times. When None, fresh OS entropy is used.
+            trace: record the events of the first ``trace`` replications in
+                ``result.event_log`` as rows (rep, device, event, time) with
+                events FAILURE, REPAIR_START (a team takes the device, possibly
+                after waiting in the queue) and REPAIR_DONE; see
+                ``result.timeline(rep)``. Recording draws no random numbers, so
+                every result is identical with or without it.
 
         Returns:
             FleetSimulationResult with per-device and fleet-level metrics.
         """
         reps = validate_reps(reps)
+        traced_reps = min(validate_trace(trace), reps)
+        events = []
         if self._failure_spec is None:
             raise ValueError('Failure distribution not set. Call set_failure_dist() first.')
         if self._repair_spec is None:
@@ -143,6 +151,7 @@ class Fleet:
         all_wait_times = []
 
         for r in range(reps):
+            rec = r < traced_reps
             # Reset stateful samplers (GRP virtual age) between reps; RNG
             # streams deliberately continue so replications are independent.
             for s in failure_samplers + repair_samplers:
@@ -183,9 +192,13 @@ class Fleet:
                     state_since[d] = t
                     operational[d] = False
                     device_failures[d] += 1
+                    if rec:
+                        events.append((r, d, 'FAILURE', t))
 
                     if team_busy < K:
                         team_busy += 1
+                        if rec:
+                            events.append((r, d, 'REPAIR_START', t))
                         ttr = draw_positive(repair_samplers[d], 'repair')
                         heapq.heappush(heap, (t + ttr, counter, _REPAIR_DONE, d))
                         counter += 1
@@ -201,11 +214,15 @@ class Fleet:
                     operational[d] = True
                     device_repairs[d] += 1
                     team_busy -= 1
+                    if rec:
+                        events.append((r, d, 'REPAIR_DONE', t))
 
                     if queue:
                         d_next, failed_at = queue.popleft()
                         wait_times.append(t - failed_at)
                         team_busy += 1
+                        if rec:
+                            events.append((r, d_next, 'REPAIR_START', t))
                         ttr = draw_positive(repair_samplers[d_next], 'repair')
                         heapq.heappush(heap, (t + ttr, counter, _REPAIR_DONE, d_next))
                         counter += 1
@@ -241,4 +258,6 @@ class Fleet:
             busy_team_hours=all_busy_team_hours,
             max_queue=all_max_queue,
             wait_times=all_wait_times,
+            event_log=_event_array(events) if traced_reps else None,
+            traced_reps=traced_reps,
         )
