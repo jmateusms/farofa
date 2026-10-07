@@ -2,7 +2,9 @@ import numpy as np
 
 from .distributions import DISTRIBUTIONS, Sampler
 from .results import SimulationResult, _event_array
-from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps, validate_trace
+from .utils import (
+    draw_positive, spawn_seed_sequence, validate_mission_time, validate_progress, validate_reps, validate_trace,
+)
 
 
 class SimpleDevice:
@@ -93,7 +95,7 @@ class SimpleDevice:
     def generate_repair(self):
         return draw_positive(self.repair_dist, 'repair')
 
-    def simulate(self, reps=1, seed=None, trace=0):
+    def simulate(self, reps=1, seed=None, trace=0, progress=None):
         """
         Run the failure-repair simulation.
 
@@ -107,12 +109,17 @@ class SimpleDevice:
                 the first ``trace`` replications in ``result.event_log``; see
                 ``result.timeline(rep)``. Recording draws no random numbers, so
                 every result is identical with or without it.
+            progress: optional callable ``progress(done, reps)`` called after
+                each replication, e.g. to show a progress bar. It draws no
+                random numbers; an exception it raises (for instance to cancel
+                a long run) propagates out of ``simulate``.
 
         Returns:
             SimulationResult with detailed metrics.
         """
         reps = validate_reps(reps)
         traced_reps = min(validate_trace(trace), reps)
+        progress = validate_progress(progress)
         events = []
         if self.failure_dist is None:
             raise ValueError('Failure distribution not set. Call set_failure_dist() first.')
@@ -188,6 +195,8 @@ class SimpleDevice:
             all_downtimes.append(np.array(rep_downtimes))
             total_uptime.append(rep_uptime)
             total_downtime.append(rep_downtime)
+            if progress is not None:
+                progress(r + 1, reps)
 
         return SimulationResult(
             mission_time=T,

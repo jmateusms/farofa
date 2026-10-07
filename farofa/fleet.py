@@ -5,7 +5,9 @@ import numpy as np
 
 from .distributions import DISTRIBUTIONS, Sampler
 from .results import FleetSimulationResult, _event_array
-from .utils import draw_positive, spawn_seed_sequence, validate_mission_time, validate_reps, validate_trace
+from .utils import (
+    draw_positive, spawn_seed_sequence, validate_mission_time, validate_progress, validate_reps, validate_trace,
+)
 
 _FAILURE = 0
 _REPAIR_DONE = 1
@@ -88,7 +90,7 @@ class Fleet:
         factory, args, kwargs = spec
         return [factory(*args, **kwargs) for _ in range(n)]
 
-    def simulate(self, reps=1, seed=None, trace=0):
+    def simulate(self, reps=1, seed=None, trace=0, progress=None):
         """
         Run the fleet failure-repair simulation.
 
@@ -109,12 +111,17 @@ class Fleet:
                 after waiting in the queue) and REPAIR_DONE; see
                 ``result.timeline(rep)``. Recording draws no random numbers, so
                 every result is identical with or without it.
+            progress: optional callable ``progress(done, reps)`` called after
+                each replication, e.g. to show a progress bar. It draws no
+                random numbers; an exception it raises (for instance to cancel
+                a long run) propagates out of ``simulate``.
 
         Returns:
             FleetSimulationResult with per-device and fleet-level metrics.
         """
         reps = validate_reps(reps)
         traced_reps = min(validate_trace(trace), reps)
+        progress = validate_progress(progress)
         events = []
         if self._failure_spec is None:
             raise ValueError('Failure distribution not set. Call set_failure_dist() first.')
@@ -246,6 +253,8 @@ class Fleet:
             all_busy_team_hours[r] = busy_team_hours
             all_max_queue[r] = max_queue
             all_wait_times.append(np.array(wait_times))
+            if progress is not None:
+                progress(r + 1, reps)
 
         return FleetSimulationResult(
             mission_time=T,

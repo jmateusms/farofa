@@ -84,6 +84,13 @@ def validate_trace(trace):
     return value
 
 
+def validate_progress(progress):
+    """Return ``progress`` if it is ``None`` or callable; raise otherwise."""
+    if progress is not None and not callable(progress):
+        raise TypeError('progress must be a callable progress(done, reps) or None.')
+    return progress
+
+
 def draw_positive(sampler, role):
     """Draw one variate and enforce strictly positive, finite support.
 

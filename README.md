@@ -16,6 +16,7 @@ A Python framework for Monte Carlo simulation of repairable systems, with focus 
 - **Reproducible by construction:** `simulate(seed=...)` gives bit-for-bit repeatable runs (same environment), with provably independent per-device PCG64 streams via `numpy.random.SeedSequence`
 - **Vectorized random variate generation** (buffered batch draws through NumPy's PCG64 generator)
 - **Parameter estimation from failure records:** power-law NHPP (Crow-AMSAA), Weibull GRP (Kijima I/II) by maximum likelihood, and the Laplace trend test, with fits that plug straight into a simulation
+- **Graphical interface** (`farofa gui`): build a model, run it and explore the results in the browser without writing code; works offline, in Portuguese or English
 
 ## Installation
 
@@ -24,6 +25,63 @@ git clone https://github.com/jmateusms/farofa.git
 cd farofa
 pip install -e .
 ```
+
+## Graphical interface
+
+```bash
+farofa gui              # or: python -m farofa gui
+```
+
+This starts a small local server (Python standard library only, no extra
+dependencies, no internet access needed) on `http://127.0.0.1:8765/` (or the
+next free port) and opens it in the browser. Options: `--port N`,
+`--no-browser`, and `--host` (default `127.0.0.1`, this machine only). Stop it
+with Ctrl+C. The interface follows the browser language (Portuguese or
+English) and has a PT/EN switch in the top bar.
+
+![Results dashboard of a fleet with imperfect repair](docs/gui/dashboard.png)
+
+**Simulation.** The model panel on the left builds a single device or a fleet
+of N devices sharing K repair teams, with any built-in failure and repair
+distribution, mission time, replications, seed and number of traced
+replications. Fields are checked by the engine itself, so its messages appear
+under the offending field. Ready-made examples load a model in one click, and
+*Save*/*Open* keep a scenario as JSON. Long runs show progress and can be
+cancelled. The results tabs on the right:
+
+- **Dashboard**: availability, failures per replication, MTTF, MTTR and failure
+  rate; for fleets, team utilization, wait for a team, share of repairs that
+  waited and maximum queue. Intervals are the library's 95% intervals (one
+  observation per replication); the wait interval is a delta-method interval
+  of the pooled ratio computed by the interface. Histograms show the outcome
+  of every replication, a dot plot the availability of each device, and an
+  area chart the mean number of devices waiting or in repair over the mission
+  (from the traced replications). With exponential times, the run is checked
+  against the exact finite-source queue (Markov chain). *Export results*
+  downloads the engine's `to_dict()` plus the scenario.
+- **Timeline**: one traced replication as a Gantt chart (up / waiting for a
+  team / in repair, failure markers), with queue length and busy teams below.
+  Drag across it to zoom, pan with the overview strip, hover for details.
+- **Compare scenarios**: varies one parameter (teams K, devices N, mission time
+  or any distribution parameter such as q) with the same seed at every point,
+  and plots availability, wait, utilization and failures against it with
+  intervals; optional costs per team-hour and per device-hour down give the
+  cheapest number of teams. Table as CSV or JSON.
+- **Python**: the script that reproduces the model with farofa.
+
+**Estimation.** Paste or open failure times (one system, cumulative operating
+hours or times between failures, optional end of observation), or load the
+USS Halfbeak or USS Grampus records. The view shows the Laplace trend test,
+the power law, Weibull GRP Kijima I and II and the Weibull renewal process
+with AIC, observed cumulative failures against each fitted mean function (or
+against the cumulative intensity given the observed history), the profile
+likelihood of q with 95% likelihood-ratio intervals, and the times between
+failures. *Use in simulation* sends a fit to the model panel.
+
+Every chart can be saved as SVG or PNG. More screenshots:
+[timeline](docs/gui/timeline.png), [team sizing](docs/gui/team-sizing.png),
+[exact check](docs/gui/exact-check.png), [Halfbeak estimation](docs/gui/estimation-halfbeak.png)
+and [its curves](docs/gui/estimation-curves.png).
 
 ## Quick start
 
@@ -153,6 +211,10 @@ tl = result.timeline(0)         # (entity, state, start, end); state: up / waiti
 Counting `waiting` and `repair` intervals over time gives the queue length and the busy
 teams; `to_dict()` / `export_json()` include the event log when a trace was recorded.
 
+`simulate(..., progress=f)` calls `f(done, reps)` after every replication (the GUI uses it
+for its progress bar and to cancel a run by raising from `f`); like the trace, it draws no
+random numbers and changes no result.
+
 ## Available distributions
 
 | Distribution | Function | Repair assumption | Parameters |
@@ -216,6 +278,13 @@ Find optimal maintenance policies and system configurations.
 ### v4 — GUI
 
 Graphical interface for building and running simulations without code.
+
+- [x] Local web interface (`farofa gui`, standard library only, offline): model builder validated by the engine, scenario files, progress and cancel
+- [x] Results dashboard with confidence intervals, per-replication histograms, interactive timeline (zoom, hover), queue and busy teams over time, SVG/PNG/JSON export
+- [x] Scenario comparison (one-parameter sweeps with common random numbers, cost-based team sizing)
+- [x] Estimation view: Laplace test, power-law and GRP fits with AIC, mean functions, profile likelihood of q, fit sent to the simulation
+- [x] Portuguese and English
+- [ ] Views for heterogeneous systems and optimization (following v2 and v3)
 
 ### v5 — Parameter estimation
 
