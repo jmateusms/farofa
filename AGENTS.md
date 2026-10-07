@@ -12,6 +12,9 @@ farofa (Failure And Repair simulation Optimization Framework) is a Python librar
   - `distributions.py` — distribution factories: `exponential`, `weibull`, `weibull_min`, `weibull_grp` (Kijima I), `weibull_grp2` (Kijima II), `lognormal`, `normal`, `gamma`
   - `results.py` — `SimulationResult` / `FleetSimulationResult`: metrics (availability, MTTF/MTTR, utilization, queue/wait)
   - `utils.py` — small shared helpers
+  - `estimation.py` — failure-process fits (power law, Weibull GRP) and the Laplace test
+  - `cli.py`, `__main__.py` — `farofa gui` / `python -m farofa gui`
+  - `gui/` — local web interface: `server.py` (stdlib HTTP server, JSON API, worker-thread jobs), `api.py` (scenarios, runs, sweeps, fits on top of the public API), `static/` (plain HTML/CSS/JS modules, hand-written SVG charts, pt-BR/English dictionary in `i18n.js`)
 - `examples/` — runnable usage examples
 - `tests/` — pytest suite
 - `misc/` — planning docs (git-ignored): ROADMAP.md, CRITICAL_ANALYSIS.md, OPEN_DECISIONS.md, PAPER_PLAN.md — read ROADMAP.md before starting non-trivial work
