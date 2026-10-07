@@ -15,6 +15,7 @@ A Python framework for Monte Carlo simulation of repairable systems, with focus 
 - **Monte Carlo replication** for statistical analysis (failures, availability, MTTF, MTTR, utilization, queue/wait metrics)
 - **Reproducible by construction:** `simulate(seed=...)` gives bit-for-bit repeatable runs (same environment), with provably independent per-device PCG64 streams via `numpy.random.SeedSequence`
 - **Vectorized random variate generation** (buffered batch draws through NumPy's PCG64 generator)
+- **Parameter estimation from failure records:** power-law NHPP (Crow-AMSAA), Weibull GRP (Kijima I/II) by maximum likelihood, and the Laplace trend test, with fits that plug straight into a simulation
 
 ## Installation
 
@@ -105,6 +106,37 @@ finite-horizon convention and all assumptions in
 `illustrative_team_sizing_results.json`. Its values are deliberately invented
 for a reproducible example and are **not** a real staffing recommendation.
 
+### From failure data to simulation
+
+`farofa.estimation` fits a failure process to the cumulative operating times
+at which **one** system failed, observed from new (`t = 0`) until `end_time`
+(failure-truncated at the last failure when omitted):
+
+```python
+import farofa
+
+times = [...]  # cumulative operating hours at each failure, ascending
+u, p = farofa.laplace_trend_test(times, end_time=T)  # u > 0: deterioration
+nhpp = farofa.fit_power_law(times, end_time=T)        # minimal repair (q = 1)
+grp = farofa.fit_weibull_grp(times, end_time=T)        # Kijima I, q estimated
+print(nhpp.b, grp.q, grp.aic, nhpp.aic)
+
+device = farofa.SimpleDevice()
+device.set_failure_dist(*grp.distribution())   # ('weibull_grp', a, b, q)
+device.set_repair_dist('lognormal', 2.0, 0.4)  # repair times fitted separately
+```
+
+The power law has a closed form. For the GRP the scale is profiled out and
+the likelihood is maximized over shape and `q` (grid plus golden-section
+search, NumPy only); `fit_weibull_grp(..., q=value)` fixes `q`, so a loop over
+`q` traces its profile likelihood for interval estimates. `q = 1` reproduces
+the power law and `q = 0` a Weibull renewal process. Repair durations do not
+enter these likelihoods.
+
+`examples/repairable_data_fit.py` runs the whole path on two published
+diesel-engine records (USS Halfbeak, which deteriorates, and USS Grampus,
+which shows no trend).
+
 ## Available distributions
 
 | Distribution | Function | Repair assumption | Parameters |
@@ -173,7 +205,8 @@ Graphical interface for building and running simulations without code.
 
 Estimate distribution parameters from observed failure/repair data.
 
-- [ ] Maximum likelihood estimation for supported distributions
+- [x] Maximum likelihood estimation for repairable-system failure processes (power-law NHPP, Weibull GRP Kijima I/II) and the Laplace trend test
+- [ ] Maximum likelihood estimation for the remaining (repair-time) distributions
 - [ ] Goodness-of-fit testing
 - [ ] Integration with or reference to existing tools (e.g., `reliability` package)
 
