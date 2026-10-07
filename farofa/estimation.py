@@ -113,12 +113,19 @@ def _virtual_ages(s, q, kijima):
 
 
 def _hazard_increment(v, x, b):
-    """(v + x)**b - v**b without cancellation; v and x arrays, b array (m,)."""
+    """(v + x)**b - v**b without cancellation; v and x arrays, b array (m,).
+
+    Factored as (v + x)**b * (1 - (v / (v + x))**b). In window units
+    v + x <= 1, so the first factor cannot overflow, and the second, written
+    as -expm1(-b * log1p(x / v)), lies in (0, 1] with full relative accuracy
+    (it is exactly 1 when v = 0). Factoring out v**b instead underflows when v
+    is tiny next to x (q near 0) while its partner overflows, which corrupts
+    the likelihood there.
+    """
     v = v[:, None]
     x = x[:, None]
-    with np.errstate(divide='ignore', invalid='ignore'):
-        aged = np.power(v, b) * np.expm1(b * np.log1p(x / v))
-    return np.where(v > 0.0, aged, np.power(x, b))
+    with np.errstate(divide='ignore'):
+        return np.power(v + x, b) * -np.expm1(-b * np.log1p(x / v))
 
 
 def _profile(s, c, q, kijima, log_b):

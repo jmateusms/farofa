@@ -69,6 +69,18 @@ def test_reported_log_likelihood_is_the_unscaled_one(kijima):
     assert fit.log_likelihood == pytest.approx(direct, rel=1e-9)
 
 
+def test_steep_wear_out_with_near_perfect_repair_is_not_overstated():
+    # Regular renewals (shape 20, q near 0): v is tiny next to each gap, where
+    # factoring out v**b underflowed and inflated the likelihood (b ~ 37, q ~ 1e-8).
+    times = np.cumsum(100.0 * np.random.default_rng(3).weibull(20.0, 40))
+    fit = fit_weibull_grp(times)
+    direct = _grp_loglik(times, times[-1], fit.a, fit.b, fit.q, 1)
+    assert fit.log_likelihood == pytest.approx(direct, rel=1e-9)
+    renewal = fit_weibull_grp(times, q=0.0)
+    assert fit.log_likelihood >= renewal.log_likelihood - 1e-9
+    assert fit.b == pytest.approx(renewal.b, rel=0.05)
+
+
 @pytest.mark.parametrize('factory, kijima', [
     (lambda: farofa.weibull_grp(1.0, 2.0, 0.3), 1),
     (lambda: farofa.weibull_grp2(1.0, 2.0, 0.3), 2),
