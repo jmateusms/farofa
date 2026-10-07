@@ -111,6 +111,15 @@ def test_invalid_records_are_rejected(times, end_time):
         fit_weibull_grp(times, end_time)
 
 
+def test_power_law_and_trend_test_accept_tied_records():
+    times = [100.0, 250.0, 250.0, 400.0, 610.0]
+    fit = fit_power_law(times, end_time=700.0)
+    assert fit.b == pytest.approx(5 / np.sum(np.log(700.0 / np.array(times))))
+    assert math.isfinite(laplace_trend_test(times, end_time=700.0)[0])
+    with pytest.raises(ValueError, match='ties'):
+        fit_weibull_grp(times, end_time=700.0)
+
+
 def test_fit_feeds_a_simulation():
     times = _history(lambda: farofa.weibull_min(100.0, 2.0), 30, seed=8)
     fit = fit_power_law(times)

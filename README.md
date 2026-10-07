@@ -133,6 +133,10 @@ search, NumPy only); `fit_weibull_grp(..., q=value)` fixes `q`, so a loop over
 the power law and `q = 0` a Weibull renewal process. Repair durations do not
 enter these likelihoods.
 
+`examples/repairable_data_fit.py` runs the whole path on two published
+diesel-engine records (USS Halfbeak, which deteriorates, and USS Grampus,
+which shows no trend).
+
 ## Available distributions
 
 | Distribution | Function | Repair assumption | Parameters |

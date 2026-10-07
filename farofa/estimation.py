@@ -60,15 +60,17 @@ class RepairableFit:
         return (self.model, self.a, self.b, self.q)
 
 
-def _validate(times, end_time, min_failures) -> Tuple[np.ndarray, float, bool]:
+def _validate(times, end_time, min_failures, allow_ties=False) -> Tuple[np.ndarray, float, bool]:
     t = np.asarray(times, dtype=float)
     if t.ndim != 1 or t.size < min_failures:
         raise ValueError(f'times must be a 1-D sequence with at least {min_failures} failures.')
     if not np.all(np.isfinite(t)) or t[0] <= 0.0:
         raise ValueError('failure times must be finite and greater than 0.')
-    if np.any(np.diff(t) <= 0.0):
-        raise ValueError('failure times must be strictly increasing cumulative times '
-                         '(ties give zero-length intervals; record them with more precision).')
+    steps = np.diff(t)
+    if np.any(steps < 0.0) or (not allow_ties and np.any(steps == 0.0)):
+        raise ValueError('failure times must be increasing cumulative times'
+                         + ('.' if allow_ties else ' without ties (a tie is a zero-length '
+                            'interval; record the times with more precision).'))
     if end_time is None:
         return t, float(t[-1]), True
     end = float(end_time)
@@ -82,9 +84,10 @@ def fit_power_law(times, end_time: Optional[float] = None) -> RepairableFit:
 
     ``beta = n / sum(ln(T / t_i))`` and ``lambda = n / T**beta`` with ``T`` the
     end of observation (``t_n`` if failure-truncated). ``beta > 1`` means the
-    failure intensity grows with age (deterioration).
+    failure intensity grows with age (deterioration). Tied times (rounded
+    records) are allowed.
     """
-    t, end, failure_truncated = _validate(times, end_time, 2)
+    t, end, failure_truncated = _validate(times, end_time, 2, allow_ties=True)
     n = t.size
     log_ratio_sum = float(np.sum(np.log(end / t)))
     if log_ratio_sum <= 0.0:
@@ -210,9 +213,9 @@ def laplace_trend_test(times, end_time: Optional[float] = None) -> Tuple[float, 
     Returns ``(U, p_value)`` with a two-sided normal p-value. ``U > 0`` means
     failures concentrate late in the window (deterioration); ``U < 0`` means
     reliability growth. A failure-truncated record drops the last failure,
-    which only marks the end of the window.
+    which only marks the end of the window. Tied times are allowed.
     """
-    t, end, failure_truncated = _validate(times, end_time, 2)
+    t, end, failure_truncated = _validate(times, end_time, 2, allow_ties=True)
     if failure_truncated:
         t = t[:-1]
     m = t.size
