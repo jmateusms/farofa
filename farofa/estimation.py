@@ -210,7 +210,7 @@ def fit_weibull_grp(times, end_time: Optional[float] = None, kijima: int = 1,
     _, total = _profile(s, c, q_hat, kijima, log_b)
     a = end * (float(total[0]) / n) ** (1.0 / b)
     model = 'weibull_grp' if kijima == 1 else 'weibull_grp2'
-    return RepairableFit(model, a, b, q_hat, ll_scaled - n * math.log(end), n, end,
+    return RepairableFit(model, a, b, float(q_hat), ll_scaled - n * math.log(end), n, end,
                          failure_truncated, q_fixed=q is not None)
 
 

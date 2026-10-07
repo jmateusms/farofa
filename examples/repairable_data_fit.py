@@ -67,7 +67,8 @@ def main():
     print(f'  q = {grp.q:.2f}, 95% profile-likelihood interval [{inside.min():.2f}, {inside.max():.2f}]')
 
     # The fitted model drives a simulation; near-instant repairs count failures
-    # over operating time, so the expected count should be close to the 71 observed.
+    # over operating time. The expected count is close to the 71 observed but not
+    # equal to it: only the power law's MLE matches the two exactly.
     engine = farofa.SimpleDevice()
     engine.set_failure_dist(*grp.distribution())
     engine.set_repair_dist('exponential', 1e6)
