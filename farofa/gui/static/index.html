@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>farofa</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">Pular para o conteúdo</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 17h4l2-8 3 12 3-16 2 12h4"/></svg></span>
+    <div><b>farofa</b><small data-i18n="brand.sub">simulação de sistemas reparáveis</small></div>
+  </div>
+  <nav class="views" role="tablist" aria-label="Views" data-i18n-aria-label="views.aria">
+    <button role="tab" id="view-tab-sim" aria-controls="view-sim" aria-selected="true" data-view="sim" data-i18n="views.sim">Simulação</button>
+    <button role="tab" id="view-tab-est" aria-controls="view-est" aria-selected="false" data-view="est" data-i18n="views.est">Estimação</button>
+  </nav>
+  <span class="grow"></span>
+  <span class="version muted" id="version"></span>
+  <div class="seg lang" role="group" aria-label="Idioma / Language">
+    <button type="button" data-lang="pt" lang="pt-BR">PT</button>
+    <button type="button" data-lang="en" lang="en">EN</button>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ======================================================== simulação -->
+  <section class="view" id="view-sim" role="tabpanel" aria-labelledby="view-tab-sim">
+    <aside class="side" aria-labelledby="model-title">
+      <div class="side-head">
+        <h2 id="model-title" data-i18n="model.title">Modelo</h2>
+        <div class="row tight">
+          <button type="button" class="small ghost" id="scenario-save" data-i18n="model.save" data-i18n-title="model.save.title">Salvar</button>
+          <button type="button" class="small ghost" id="scenario-open" data-i18n="model.open" data-i18n-title="model.open.title">Abrir</button>
+          <input type="file" id="scenario-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <div class="field">
+        <label for="preset" data-i18n="model.preset">Exemplo pronto</label>
+        <select id="preset"></select>
+        <p class="hint" id="preset-note"></p>
+      </div>
+
+      <div class="field">
+        <span class="label" id="system-label" data-i18n="model.system">Sistema</span>
+        <div class="seg full" role="radiogroup" aria-labelledby="system-label" id="system">
+          <button type="button" role="radio" data-system="device" data-i18n="model.device">Um equipamento</button>
+          <button type="button" role="radio" data-system="fleet" data-i18n="model.fleet">Frota com equipes</button>
+        </div>
+      </div>
+      <div class="row2" id="fleet-fields">
+        <div class="field"><label for="f-n_devices" data-i18n="model.n">Equipamentos N</label><input id="f-n_devices" data-key="n" inputmode="numeric" autocomplete="off"><p class="err" data-err="n_devices"></p></div>
+        <div class="field"><label for="f-n_teams" data-i18n="model.k">Equipes de reparo K</label><input id="f-n_teams" data-key="k" inputmode="numeric" autocomplete="off"><p class="err" data-err="n_teams"></p></div>
+      </div>
+
+      <fieldset class="box" id="box-failure">
+        <legend data-i18n="model.failures">Tempo até a falha</legend>
+        <div class="field"><label for="failure-dist" data-i18n="model.dist">Distribuição</label><select id="failure-dist" data-role="failure"></select><p class="err" data-err="failure.dist"></p></div>
+        <div class="params" id="failure-params"></div>
+        <p class="err" data-err="failure"></p>
+        <p class="hint" id="failure-hint"></p>
+      </fieldset>
+
+      <fieldset class="box" id="box-repair">
+        <legend data-i18n="model.repairs">Tempo de reparo</legend>
+        <div class="field"><label for="repair-dist" data-i18n="model.dist">Distribuição</label><select id="repair-dist" data-role="repair"></select><p class="err" data-err="repair.dist"></p></div>
+        <div class="params" id="repair-params"></div>
+        <p class="err" data-err="repair"></p>
+        <p class="hint" id="repair-hint"></p>
+      </fieldset>
+
+      <fieldset class="box">
+        <legend data-i18n="model.run">Execução</legend>
+        <div class="row2">
+          <div class="field"><label for="f-mission_time" data-i18n="model.T">Tempo de missão T (h)</label><input id="f-mission_time" data-key="T" inputmode="decimal" autocomplete="off"><p class="err" data-err="mission_time"></p></div>
+          <div class="field"><label for="f-reps" data-i18n="model.reps">Replicações</label><input id="f-reps" data-key="reps" inputmode="numeric" autocomplete="off"><p class="err" data-err="reps"></p></div>
+          <div class="field"><label for="f-seed" data-i18n="model.seed">Semente</label>
+            <div class="inl"><input id="f-seed" data-key="seed" inputmode="numeric" autocomplete="off"><button type="button" class="small ghost icon" id="seed-new" data-i18n-title="model.seed.new" data-i18n-aria-label="model.seed.new">⟳</button></div>
+            <p class="err" data-err="seed"></p></div>
+          <div class="field"><label for="f-trace" data-i18n="model.trace">Replicações registradas</label><input id="f-trace" data-key="trace" inputmode="numeric" autocomplete="off" data-i18n-title="model.trace.title"><p class="err" data-err="trace"></p></div>
+        </div>
+      </fieldset>
+
+      <div class="side-foot">
+        <div class="runbar">
+          <button type="button" class="primary" id="run" data-i18n="model.runBtn">Simular</button>
+          <button type="button" class="danger" id="run-cancel" hidden data-i18n="cancel">Cancelar</button>
+          <span class="status" id="model-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="progress" id="run-progress" hidden><div class="bar"><i></i></div><span class="ptext"></span></div>
+      </div>
+    </aside>
+
+    <div class="results">
+      <nav class="tabs" role="tablist" aria-label="Resultados" data-i18n-aria-label="tabs.aria">
+        <button role="tab" id="tab-dash" aria-controls="panel-dash" aria-selected="true" data-tab="dash" data-i18n="tabs.dash">Painel</button>
+        <button role="tab" id="tab-timeline" aria-controls="panel-timeline" aria-selected="false" data-tab="timeline" data-i18n="tabs.timeline">Linha do tempo</button>
+        <button role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false" data-tab="compare" data-i18n="tabs.compare">Comparar cenários</button>
+        <button role="tab" id="tab-code" aria-controls="panel-code" aria-selected="false" data-tab="code" data-i18n="tabs.code">Python</button>
+      </nav>
+      <div class="tabpanel" id="panel-dash" role="tabpanel" aria-labelledby="tab-dash"></div>
+      <div class="tabpanel" id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" hidden></div>
+      <div class="tabpanel" id="panel-compare" role="tabpanel" aria-labelledby="tab-compare" hidden></div>
+      <div class="tabpanel" id="panel-code" role="tabpanel" aria-labelledby="tab-code" hidden></div>
+    </div>
+  </section>
+
+  <!-- ======================================================== estimação -->
+  <section class="view" id="view-est" role="tabpanel" aria-labelledby="view-tab-est" hidden>
+    <aside class="side" aria-labelledby="est-title">
+      <div class="side-head"><h2 id="est-title" data-i18n="est.title">Dados de falha</h2></div>
+      <p class="hint" style="margin-bottom: 12px" data-i18n="est.intro">Tempos acumulados de operação em que um sistema reparável falhou, observados desde novo (t = 0).</p>
+      <div class="field">
+        <span class="label" data-i18n="est.datasets">Registros publicados</span>
+        <div class="datasets" id="datasets"></div>
+      </div>
+      <div class="field">
+        <label for="est-text" data-i18n="est.times">Tempos de falha (h)</label>
+        <textarea id="est-text" rows="9" spellcheck="false" data-i18n-placeholder="est.placeholder"></textarea>
+        <div class="row tight">
+          <button type="button" class="small ghost" id="est-open" data-i18n="est.file">Abrir arquivo CSV ou texto</button>
+          <input type="file" id="est-file" accept=".csv,.txt,.tsv,text/plain,text/csv" hidden>
+          <span class="hint" id="est-count"></span>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label" id="est-kind-label" data-i18n="est.kind">Os valores são</span>
+        <div class="seg full" role="radiogroup" aria-labelledby="est-kind-label" id="est-kind">
+          <button type="button" role="radio" data-kind="cumulative" data-i18n="est.cumulative">tempos acumulados</button>
+          <button type="button" role="radio" data-kind="intervals" data-i18n="est.intervals">tempos entre falhas</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="est-end" data-i18n="est.end">Fim da observação T (h)</label>
+        <input id="est-end" inputmode="decimal" autocomplete="off" data-i18n-placeholder="est.end.placeholder">
+        <p class="hint" data-i18n="est.end.hint">Vazio: o registro termina na última falha.</p>
+      </div>
+      <div class="runbar">
+        <button type="button" class="primary" id="est-run" data-i18n="est.run">Ajustar modelos</button>
+        <span class="status" id="est-status" role="status" aria-live="polite"></span>
+      </div>
+    </aside>
+    <div class="results" id="est-results"></div>
+  </section>
+</main>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script type="module" src="/static/main.js"></script>
+</body>
+</html>
