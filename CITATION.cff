@@ -10,7 +10,7 @@ authors:
     affiliation: "Universidade Federal de Pernambuco (UFPE), Departamento de Engenharia de Produção, CEERMA"
 version: "0.2.0"
 date-released: "2026-10-08"
-license: GPL-3.0-or-later
+license: BSD-3-Clause
 repository-code: "https://github.com/jmateusms/farofa"
 keywords:
   - reliability
