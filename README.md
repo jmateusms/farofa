@@ -1,5 +1,7 @@
 # farofa
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23244047.svg)](https://doi.org/10.5281/zenodo.23244047)
+
 **F**ailure **A**nd **R**epair simulation **O**ptimization **F**r**A**mework
 
 A Python framework for Monte Carlo simulation of repairable systems, with focus on reliability analysis. farofa enables modeling devices subject to failure and repair processes using common lifetime distributions, including imperfect repair models such as the Generalized Renewal Process (GRP).
@@ -313,7 +315,7 @@ farofa is inspired by research in reliability engineering, particularly repairab
 
 ## Citing
 
-If you use farofa in academic work, please cite it: GitHub's **Cite this repository** button (from [CITATION.cff](https://github.com/jmateusms/farofa/blob/main/CITATION.cff)) gives APA and BibTeX.
+If you use farofa in academic work, please cite it: GitHub's **Cite this repository** button (from [CITATION.cff](https://github.com/jmateusms/farofa/blob/main/CITATION.cff)) gives APA and BibTeX. Releases are archived on Zenodo: [doi:10.5281/zenodo.23244047](https://doi.org/10.5281/zenodo.23244047) cites the software across versions, and each release has its own DOI on that page.
 
 ## License
 
