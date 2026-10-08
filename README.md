@@ -311,6 +311,10 @@ farofa is inspired by research in reliability engineering, particularly repairab
 - Wang, Z. M. & Yang, J. G. (2012). Numerical method for Weibull generalized renewal process and its applications in reliability analysis of NC machine tools. *Computers and Industrial Engineering*. [DOI](https://doi.org/10.1016/j.cie.2012.06.019)
 - Moura, M. C. et al. (2014). A competing risk model for dependent and imperfect condition-based preventive and corrective maintenances. *Proceedings of the Institution of Mechanical Engineers Part O*, 228(6), 590–605. [DOI](https://doi.org/10.1177/1748006X14540878)
 
+## Citing
+
+If you use farofa in academic work, please cite it: GitHub's **Cite this repository** button (from [CITATION.cff](https://github.com/jmateusms/farofa/blob/main/CITATION.cff)) gives APA and BibTeX.
+
 ## License
 
-GNU General Public License v3 — see [LICENSE](https://github.com/jmateusms/farofa/tree/main/LICENSE).
+BSD 3-Clause — see [LICENSE](https://github.com/jmateusms/farofa/blob/main/LICENSE). Versions up to 0.2.0 were released under the GNU General Public License v3.
