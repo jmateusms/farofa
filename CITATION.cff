@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "Se usar este software num trabalho, cite-o como abaixo. If you use this software, please cite it as below."
+type: software
+title: "farofa: Failure And Repair simulation Optimization Framework"
+abstract: "Monte Carlo simulation of repairable systems (perfect, minimal and imperfect repair, Kijima GRP), fleets with shared maintenance teams, and parameter estimation from failure records, with a local graphical interface."
+authors:
+  - family-names: Santana
+    given-names: Mateus
+    email: jmateussan@gmail.com
+    affiliation: "Universidade Federal de Pernambuco (UFPE), Departamento de Engenharia de Produção, CEERMA"
+version: "0.2.0"
+date-released: "2026-10-08"
+license: GPL-3.0-or-later
+repository-code: "https://github.com/jmateusms/farofa"
+keywords:
+  - reliability
+  - repairable systems
+  - Monte Carlo simulation
+  - generalized renewal process
+  - maintenance
