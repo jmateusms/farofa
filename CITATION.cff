@@ -8,7 +8,7 @@ authors:
     given-names: Mateus
     email: jmateussan@gmail.com
     affiliation: "Universidade Federal de Pernambuco (UFPE), Departamento de Engenharia de Produção, CEERMA"
-version: "0.2.0"
+version: "0.2.1"
 date-released: "2026-10-08"
 license: BSD-3-Clause
 repository-code: "https://github.com/jmateusms/farofa"
