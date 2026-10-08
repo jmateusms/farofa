@@ -21,6 +21,12 @@ A Python framework for Monte Carlo simulation of repairable systems, with focus 
 ## Installation
 
 ```bash
+pip install farofa
+```
+
+From a checkout of this repository:
+
+```bash
 git clone https://github.com/jmateusms/farofa.git
 cd farofa
 pip install -e .
@@ -39,7 +45,7 @@ next free port) and opens it in the browser. Options: `--port N`,
 with Ctrl+C. The interface follows the browser language (Portuguese or
 English) and has a PT/EN switch in the top bar.
 
-![Results dashboard of a fleet with imperfect repair](docs/gui/dashboard.png)
+![Results dashboard of a fleet with imperfect repair](https://raw.githubusercontent.com/jmateusms/farofa/main/docs/gui/dashboard.png)
 
 **Simulation.** The model panel on the left builds a single device or a fleet
 of N devices sharing K repair teams, with any built-in failure and repair
@@ -79,9 +85,9 @@ likelihood of q with 95% likelihood-ratio intervals, and the times between
 failures. *Use in simulation* sends a fit to the model panel.
 
 Every chart can be saved as SVG or PNG. More screenshots:
-[timeline](docs/gui/timeline.png), [team sizing](docs/gui/team-sizing.png),
-[exact check](docs/gui/exact-check.png), [Halfbeak estimation](docs/gui/estimation-halfbeak.png)
-and [its curves](docs/gui/estimation-curves.png).
+[timeline](https://raw.githubusercontent.com/jmateusms/farofa/main/docs/gui/timeline.png), [team sizing](https://raw.githubusercontent.com/jmateusms/farofa/main/docs/gui/team-sizing.png),
+[exact check](https://raw.githubusercontent.com/jmateusms/farofa/main/docs/gui/exact-check.png), [Halfbeak estimation](https://raw.githubusercontent.com/jmateusms/farofa/main/docs/gui/estimation-halfbeak.png)
+and [its curves](https://raw.githubusercontent.com/jmateusms/farofa/main/docs/gui/estimation-curves.png).
 
 ## Quick start
 
@@ -231,7 +237,7 @@ random numbers and changes no result.
 ## Roadmap
 
 farofa is being developed incrementally. Below is the planned scope for each milestone.
-The versioned current-state plan is [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
+The versioned current-state plan is [docs/DEVELOPMENT_PLAN.md](https://github.com/jmateusms/farofa/blob/main/docs/DEVELOPMENT_PLAN.md).
 
 ### v0 — Single device simulation
 
@@ -307,4 +313,4 @@ farofa is inspired by research in reliability engineering, particularly repairab
 
 ## License
 
-GNU General Public License v3 — see [LICENSE](LICENSE).
+GNU General Public License v3 — see [LICENSE](https://github.com/jmateusms/farofa/tree/main/LICENSE).
