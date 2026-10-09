@@ -1,6 +1,6 @@
 """Numerical regression tests for the GRP sampler and positive-support guards.
 
-These target BUG-2 (misc/CRITICAL_ANALYSIS.md): the textbook inversion form
+They cover a fixed bug: the textbook inversion form
 x = a*((v/a)^b - ln u)^(1/b) - v suffers catastrophic cancellation at high
 virtual age (0.16% of draws <= 0 at v=1e6; 100% at v=1e9 for a=100, b=3) and
 (v/a)^b overflow for large shapes. The rewritten log-space form must produce

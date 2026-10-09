@@ -1,6 +1,6 @@
 """Regression tests for result metrics against analytical values.
 
-These target BUG-1 (misc/CRITICAL_ANALYSIS.md): the naive mean of completed
+They cover a fixed bug: the naive mean of completed
 inter-failure intervals in a fixed mission window is length-biased and
 underestimated MTTF by ~3x in the heavily-censored regime tested here.
 """
